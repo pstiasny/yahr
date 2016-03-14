@@ -6,6 +6,8 @@ Scene {
                                      shininess = 10
                                    }
               ],
+  lights = [ PointLight (Vec3 0 -10 -15),
+             PointLight (Vec3 0 10 15)],
   objects = [ Sphere { position = Vec3 (-2.4) (-0.8) 20,
                        radius = 1,
                        materialId = "default" },

@@ -6,7 +6,8 @@ import System.Environment
 import Codec.Picture
 
 import Data.Vectors
-import Data.Scene
+import qualified Data.Scene as Scene
+import Data.Scene as Scene hiding (lights)
 
 data Hit a = Hit { point :: Vec3, normal :: Vec3, what :: a }
 
@@ -69,11 +70,11 @@ collideScene s = collideAll sceneColliders
     collideSceneObject so = case so of
       Sphere p r mId -> collideSphere (sh mId) r p
     sh mId = mats Map.! mId
-    mats = Map.fromList [(Data.Scene.id m, shaderForMat m) | m <- materials s]
+    mats = Map.fromList [(Scene.id m, shaderForMat m) | m <- materials s]
     shaderForMat mat = case mat of
       BlinnPhongMaterial id ambient diffuse specular shininess ->
         blinnPhong ambient diffuse specular shininess lights
-    lights = [Vec3 0 10 15]
+    lights = [v | PointLight v <- Scene.lights s]
 
 
 computeInitialRay :: Camera -> Int -> Int -> Ray
