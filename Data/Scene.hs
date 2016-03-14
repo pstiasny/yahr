@@ -2,8 +2,6 @@
 
 module Data.Scene where
 
-import Data.Aeson
-
 import Data.Vectors
 
 type Color = Vec3
@@ -20,7 +18,10 @@ data Material = BlinnPhongMaterial { id :: String,
                                      shininess :: Float
                                    } deriving (Read, Show)
 
+data SceneLight = PointLight Vec3 deriving (Read, Show)
+
 data Scene = Scene { materials :: [ Material ],
+                     lights :: [ SceneLight ],
                      objects :: [ SceneObject ]
                    } deriving (Read, Show)
 
