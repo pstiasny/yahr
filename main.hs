@@ -1,7 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 import Data.List (sortOn)
-import qualified Data.Map as Map
+import Data.Maybe (isJust, fromJust)
+import Data.Map (Map, fromList, (!))
 import System.Environment
 import Codec.Picture
 
@@ -28,6 +29,11 @@ data Camera = Camera { imW :: Float, imH :: Float,
                        w :: Float, h :: Float, l :: Float
                      } deriving (Show)  
 
+
+headMay [] = Nothing
+headMay (h:_) = Just h
+
+
 blinnPhong :: Vec3 -> Vec3 -> Vec3 -> Float -> [Vec3] -> Shader
 blinnPhong ambientColor diffuseColor specularColor shininess
            lights ShaderInput { ray, hit } =
@@ -46,7 +52,8 @@ blinnPhong ambientColor diffuseColor specularColor shininess
 
   in  ambientColor + (sum $ map pointLight lights)
 
-collideSphere :: a -> Float -> Vec3 -> Ray -> [Hit a]
+
+collideSphere :: a -> Float -> Vec3 -> Ray -> Maybe (Hit a)
 collideSphere shader r s (Ray {x0, u}) =
   let d = x0 - s
       a = u .* u
@@ -55,22 +62,28 @@ collideSphere shader r s (Ray {x0, u}) =
       delta = b * b - 4 * a * c
       ts = if delta < 0 then [] else [ (- b - sqrt delta) / (2 * a)
                                      , (- b + sqrt delta) / (2 * a) ]
-      xs = [ x0 + t @* u | t <- ts ]
-  in  [Hit { point = x, normal = norm $ x - s, what = shader } | x <- xs]
+      xs = [ x0 + t @* u | t <- ts, t > 0 ]
+  in  headMay [Hit { point = x, normal = norm $ x - s, what = shader }
+              | x <- xs]
 
 
-collideAll :: [Ray -> [Hit a]] -> Ray -> [Hit a]
-collideAll colliders line = foldl1 (++) $ map ($line) colliders
+collideAll :: [Ray -> Maybe (Hit a)] -> Ray -> Maybe (Hit a)
+collideAll colliders ray =
+  headMay $
+    sortOn (lensq . (x0 ray -) . point) $
+    map fromJust $
+    filter isJust $
+    map ($ ray) colliders
 
 
-collideScene :: Scene -> Ray -> [Hit Shader]
+collideScene :: Scene -> Ray -> Maybe VHit
 collideScene s = collideAll sceneColliders
   where
     sceneColliders = [collideSceneObject o | o <- objects s]
-    collideSceneObject so = case so of
-      Sphere p r mId -> collideSphere (sh mId) r p
-    sh mId = mats Map.! mId
-    mats = Map.fromList [(Scene.id m, shaderForMat m) | m <- materials s]
+    collideSceneObject (Sphere p r mId) = collideSphere (sh mId) r p
+    sh mId = mats ! mId
+    mats :: Map String Shader
+    mats = fromList [(Scene.id m, shaderForMat m) | m <- materials s]
     shaderForMat mat = case mat of
       BlinnPhongMaterial id ambient diffuse specular shininess ->
         blinnPhong ambient diffuse specular shininess lights
@@ -86,16 +99,17 @@ computeInitialRay (Camera {imW, imH, w, h, l}) x y =
   in  Ray { x0 = Vec3 0 0 (-l), u = norm $ Vec3 px py l }
 
 
-getPixel :: (Ray -> [VHit]) -> Camera -> Int -> Int -> PixelRGBF
+getPixel :: (Ray -> Maybe VHit) -> Camera -> Int -> Int -> PixelRGBF
 getPixel collide cam x y = 
   let ray = computeInitialRay cam x y
       cs = collide ray
-      frontFacing = filter (\c -> (u ray) .* (normal c) < 0) cs
-      mc = sortOn (lensq . (x0 ray -) . point) frontFacing
-  in  case mc of
-        [] -> PixelRGBF 0 0 0
-        hit@Hit {what = shader}:_ -> 
-          let Vec3 r g b = shader (ShaderInput { ray = ray, hit = hit, lights = [], caster = \_ -> Vec3 0 0 0 })
+  in  case cs of
+        Nothing -> PixelRGBF 0 0 0
+        Just hit@Hit {what = shader} ->
+          let Vec3 r g b = shader (ShaderInput { ray = ray,
+                                                 hit = hit,
+                                                 lights = [],
+                                                 caster = const (Vec3 0 0 0) })
           in  PixelRGBF r g b
 
 
