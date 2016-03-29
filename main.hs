@@ -35,9 +35,9 @@ headMay [] = Nothing
 headMay (h:_) = Just h
 
 
-blinnPhong :: Vec3 -> Vec3 -> Vec3 -> Float -> [Vec3] -> Shader
+blinnPhong :: Vec3 -> Vec3 -> Vec3 -> Float -> Shader
 blinnPhong ambientColor diffuseColor specularColor shininess
-           lights ShaderInput { cast, ray, hit } =
+           ShaderInput { cast, ray, hit, lights } =
   let viewDir = negate $ u ray
       normalDir = normal hit
       reflectionDir = (u ray) - 2 * ((u ray) .* normalDir) @* normalDir
@@ -53,6 +53,7 @@ blinnPhong ambientColor diffuseColor specularColor shininess
             else unitv 0
 
   in  ambientColor + (sum $ map pointLight lights) + 0.4 @* cast reflectionDir
+
 
 collideSphere :: a -> Float -> Vec3 -> Collider a
 collideSphere shader r s (Ray {x0, u}) =
@@ -96,8 +97,7 @@ collideScene s = collideAll sceneColliders
     mats = fromList [(Scene.id m, shaderForMat m) | m <- materials s]
     shaderForMat mat = case mat of
       BlinnPhongMaterial id ambient diffuse specular shininess ->
-        blinnPhong ambient diffuse specular shininess lights
-    lights = [v | PointLight v <- Scene.lights s]
+        blinnPhong ambient diffuse specular shininess
 
 
 computeInitialRay :: Camera -> Int -> Int -> Ray
@@ -109,23 +109,34 @@ computeInitialRay (Camera {imW, imH, w, h, l}) x y =
   in  Ray { x0 = Vec3 0 0 (-l), u = norm $ Vec3 px py l }
 
 
-vcast :: Int -> Collider Shader -> Ray -> Color
-vcast 0 _ _ = (Vec3 0 0 0)
-vcast maxDepth collide ray =
+vcast :: Int -> Collider Shader -> [Light] -> Ray -> Color
+vcast 0 _ _ _ = (Vec3 0 0 0)
+vcast maxDepth collide lights ray =
   case collide ray of
     Nothing -> Vec3 0 0 0
-    Just hit@Hit {point, what = shader} ->
+    Just hit@Hit {point, normal = hitNormal, what = shader} ->
       shader (ShaderInput { ray = ray,
                             hit = hit,
-                            lights = [],
+                            lights = visibleLights,
                             cast = castNext })
-      where castNext n = vcast (maxDepth - 1) collide Ray { x0 = point + 0.01 @* n, u = n }
+      where castNext n = vcast (maxDepth - 1)
+                               collide
+                               lights
+                               Ray { x0 = point + 0.001 @* n, u = n }
+            visibleLights = filter isReachable lights
+            isReachable light =
+              let rayToLight = Ray {x0 = point + 0.001 @* hitNormal, u = norm $ light - point}
+                  mhit = collide rayToLight
+                  lightDistSq = lensq (light - point)
+              in  case mhit of
+                    Just (Hit {point = lp}) -> lensq (lp - point) > lightDistSq
+                    Nothing -> True
 
     
-getPixel :: Collider Shader -> Camera -> Int -> Int -> PixelRGBF
-getPixel collide cam x y = 
+getPixel :: Collider Shader -> [Light] -> Camera -> Int -> Int -> PixelRGBF
+getPixel collide lights cam x y = 
   let ray = computeInitialRay cam x y
-      Vec3 r g b = vcast 5 collide ray
+      Vec3 r g b = vcast 5 collide lights ray
   in  PixelRGBF r g b
 
 
@@ -143,5 +154,6 @@ main = do
           focalLength = 1
           camera = Camera { imW = 800, imH = 600,
                             w = 800/600, h = 1, l = focalLength }
-          img = generateImage (getPixel collider camera) 800 600
+          lights = [v | PointLight v <- Scene.lights scene]
+          img = generateImage (getPixel collider lights camera) 800 600
       savePngImage (args !! 1) (ImageRGBF img)
