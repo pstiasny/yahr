@@ -17,10 +17,11 @@ type Normal = Vec3
 data ShaderInput = ShaderInput { ray :: Ray,
                                  hit :: Hit Shader,
                                  lights :: [Light],
-                                 caster :: Normal -> Color
+                                 cast :: Normal -> Color
                                }
 type Shader = ShaderInput -> Color
 type VHit = Hit Shader
+type Collider a = Ray -> Maybe (Hit a)
 
 -- Ray described by l(t) = x0 + t * u
 data Ray = Ray { x0 :: Vec3, u :: Vec3 }
@@ -36,9 +37,10 @@ headMay (h:_) = Just h
 
 blinnPhong :: Vec3 -> Vec3 -> Vec3 -> Float -> [Vec3] -> Shader
 blinnPhong ambientColor diffuseColor specularColor shininess
-           lights ShaderInput { ray, hit } =
+           lights ShaderInput { cast, ray, hit } =
   let viewDir = negate $ u ray
       normalDir = normal hit
+      reflectionDir = (u ray) - 2 * ((u ray) .* normalDir) @* normalDir
 
       pointLight light =
         let lightDir = norm $ light - (point hit)
@@ -50,10 +52,9 @@ blinnPhong ambientColor diffuseColor specularColor shininess
             then lambertian @* diffuseColor + specularOut @* specularColor
             else unitv 0
 
-  in  ambientColor + (sum $ map pointLight lights)
+  in  ambientColor + (sum $ map pointLight lights) + 0.4 @* cast reflectionDir
 
-
-collideSphere :: a -> Float -> Vec3 -> Ray -> Maybe (Hit a)
+collideSphere :: a -> Float -> Vec3 -> Collider a
 collideSphere shader r s (Ray {x0, u}) =
   let d = x0 - s
       a = u .* u
@@ -67,7 +68,15 @@ collideSphere shader r s (Ray {x0, u}) =
               | x <- xs]
 
 
-collideAll :: [Ray -> Maybe (Hit a)] -> Ray -> Maybe (Hit a)
+collidePlane :: a -> Vec3 -> Vec3 -> Collider a
+collidePlane shader origin normal (Ray {x0, u}) =
+  let t = (normal .* (origin - x0)) / (normal .* u)
+  in  if   t > 0
+      then Just (Hit { point = x0 + t @* u, normal = normal, what = shader })
+      else Nothing
+
+
+collideAll :: [Collider a] -> Collider a
 collideAll colliders ray =
   headMay $
     sortOn (lensq . (x0 ray -) . point) $
@@ -76,11 +85,12 @@ collideAll colliders ray =
     map ($ ray) colliders
 
 
-collideScene :: Scene -> Ray -> Maybe VHit
+collideScene :: Scene -> Collider Shader
 collideScene s = collideAll sceneColliders
   where
     sceneColliders = [collideSceneObject o | o <- objects s]
     collideSceneObject (Sphere p r mId) = collideSphere (sh mId) r p
+    collideSceneObject (Plane p n mId) = collidePlane (sh mId) p n
     sh mId = mats ! mId
     mats :: Map String Shader
     mats = fromList [(Scene.id m, shaderForMat m) | m <- materials s]
@@ -99,18 +109,24 @@ computeInitialRay (Camera {imW, imH, w, h, l}) x y =
   in  Ray { x0 = Vec3 0 0 (-l), u = norm $ Vec3 px py l }
 
 
-getPixel :: (Ray -> Maybe VHit) -> Camera -> Int -> Int -> PixelRGBF
+vcast :: Int -> Collider Shader -> Ray -> Color
+vcast 0 _ _ = (Vec3 0 0 0)
+vcast maxDepth collide ray =
+  case collide ray of
+    Nothing -> Vec3 0 0 0
+    Just hit@Hit {point, what = shader} ->
+      shader (ShaderInput { ray = ray,
+                            hit = hit,
+                            lights = [],
+                            cast = castNext })
+      where castNext n = vcast (maxDepth - 1) collide Ray { x0 = point + 0.01 @* n, u = n }
+
+    
+getPixel :: Collider Shader -> Camera -> Int -> Int -> PixelRGBF
 getPixel collide cam x y = 
   let ray = computeInitialRay cam x y
-      cs = collide ray
-  in  case cs of
-        Nothing -> PixelRGBF 0 0 0
-        Just hit@Hit {what = shader} ->
-          let Vec3 r g b = shader (ShaderInput { ray = ray,
-                                                 hit = hit,
-                                                 lights = [],
-                                                 caster = const (Vec3 0 0 0) })
-          in  PixelRGBF r g b
+      Vec3 r g b = vcast 5 collide ray
+  in  PixelRGBF r g b
 
 
 main = do

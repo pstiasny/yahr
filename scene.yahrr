@@ -4,6 +4,12 @@ Scene {
                                      diffuse = Vec3 0.4 0 0,
                                      specular = Vec3 1 0 1,
                                      shininess = 10
+                                   },
+                BlinnPhongMaterial { id = "bottom",
+                                     ambient = Vec3 0 0.3 0,
+                                     diffuse = Vec3 0 1 0,
+                                     specular = Vec3 0 0.1 0,
+                                     shininess = 1
                                    }
               ],
   lights = [ PointLight (Vec3 0 -10 -15) ],
@@ -19,11 +25,17 @@ Scene {
               Sphere { position = Vec3 (-1.2) (-1) 15,
                        radius = 1,
                        materialId = "default" },
-              Sphere { position = Vec3 1.2 (-1) 15,
+              Sphere { position = Vec3 2 (-1) 15,
                        radius = 1,
                        materialId = "default" },
               Sphere { position = Vec3 0 (-1.2) 10,
                        radius = 1,
-                       materialId = "default" }
+                       materialId = "default" },
+              Sphere { position = Vec3 3 (-1.2) 10,
+                       radius = 1,
+                       materialId = "default" },
+              Plane { position = Vec3 0 (-2.2) 0,
+                      planeNormal = Vec3 0 1 0,
+                      materialId = "bottom" }
             ]
 }
