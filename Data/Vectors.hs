@@ -15,6 +15,7 @@ unitv l = Vec3 l l l
 
 (.*) :: Vec3 -> Vec3 -> Float
 (Vec3 x1 x2 x3) .* (Vec3 y1 y2 y3) = x1 * y1 + x2 * y2 + x3 * y3
+infixl 7 .*
 
 lensq :: Vec3 -> Float
 lensq v = v .* v
@@ -27,4 +28,5 @@ norm v = v * unitv (1 / len v)
 
 (@*) :: Float -> Vec3 -> Vec3
 f @* v = (unitv f) * v
+infixl 7 @*
 
