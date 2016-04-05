@@ -1,4 +1,4 @@
-module Data.Vectors where
+module Vectors where
 
 data Vec3 = Vec3 Float Float Float deriving (Read, Show)
 instance Num Vec3 where
@@ -30,3 +30,6 @@ norm v = v * unitv (1 / len v)
 f @* v = (unitv f) * v
 infixl 7 @*
 
+type Color = Vec3
+type Light = Vec3
+type Normal = Vec3
