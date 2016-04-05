@@ -1,10 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Data.Scene where
+module Scene where
 
-import Data.Vectors
+import Vectors
 
-type Color = Vec3
 
 data SceneObject =
      Sphere { position :: Vec3,
