@@ -19,6 +19,6 @@ executable yahr
   main-is:             main.hs
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.8 && <4.9, JuicyPixels, aeson, bytestring, containers
+  build-depends:       base >=4.8 && <4.9, containers, JuicyPixels, linear, hspec
   -- hs-source-dirs:      
   default-language:    Haskell2010
