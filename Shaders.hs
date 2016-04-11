@@ -34,4 +34,4 @@ blinnPhong ambientColor diffuseColor specularColor shininess
             then lambertian @* diffuseColor + specularOut @* specularColor
             else unitv 0
 
-  in  ambientColor + (sum $ map pointLight lights) + 0.4 @* cast reflectionDir
+  in  ambientColor + (sum $ map pointLight lights) + 0.2 @* cast reflectionDir

@@ -3,6 +3,7 @@
 module Scene where
 
 import Vectors
+import qualified Cameras as C
 
 
 data SceneObject =
@@ -24,7 +25,8 @@ data Material = BlinnPhongMaterial { id :: String,
 
 data SceneLight = PointLight Vec3 deriving (Read, Show)
 
-data Scene = Scene { materials :: [ Material ],
+data Scene = Scene { camera :: C.Camera,
+                     materials :: [ Material ],
                      lights :: [ SceneLight ],
                      objects :: [ SceneObject ]
                    } deriving (Read, Show)

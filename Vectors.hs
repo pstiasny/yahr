@@ -23,13 +23,34 @@ lensq v = v .* v
 len :: Vec3 -> Float
 len v = sqrt $ lensq v
 
-norm :: Vec3 -> Vec3
-norm v = v * unitv (1 / len v)
-
 (@*) :: Float -> Vec3 -> Vec3
 f @* v = (unitv f) * v
 infixl 7 @*
 
+norm :: Vec3 -> Vec3
+norm v = (1 / len v) @* v
+
+cross :: Vec3 -> Vec3 -> Vec3
+(Vec3 ax ay az) `cross` (Vec3 bx by bz) =
+  Vec3 (ay * bz - az * by)
+       (az * bx - ax * bz)
+       (ax * by - ay * bx)
+
+
 type Color = Vec3
 type Light = Vec3
 type Normal = Vec3
+
+
+data Dimension = X | Y | Z deriving (Show)
+
+getDimension :: Dimension -> Vec3 -> Float
+getDimension X (Vec3 x _ _) = x
+getDimension Y (Vec3 _ y _) = y
+getDimension Z (Vec3 _ _ z) = z
+
+maxDimension :: Vec3 -> Dimension
+maxDimension (Vec3 x y z)
+  | x > y && x > z = X
+  | y > z = Y
+  | otherwise = Z
