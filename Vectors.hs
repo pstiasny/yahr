@@ -10,6 +10,11 @@ instance Num Vec3 where
   signum (Vec3 x1 x2 x3) = Vec3 (signum x1) (signum x2) (signum x3)
   fromInteger i = Vec3 (fromInteger i) (fromInteger i) (fromInteger i)
 
+instance Fractional Vec3 where
+  (Vec3 x1 x2 x3) / (Vec3 y1 y2 y3) = Vec3 (x1 / y1) (x2 / y2) (x3 / y3)
+  recip (Vec3 x1 x2 x3) = Vec3 (recip x1) (recip x2) (recip x3)
+  fromRational i = Vec3 (fromRational i) (fromRational i) (fromRational i)
+
 unitv :: Float -> Vec3
 unitv l = Vec3 l l l
 

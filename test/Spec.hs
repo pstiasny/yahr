@@ -1,9 +1,13 @@
 {-# LANGUAGE NamedFieldPuns #-}
+import Data.Maybe (isJust, isNothing)
+
 import Test.Hspec
 
 import Vectors
 import Rays
 import Cameras
+import qualified Shapes
+import qualified Scene
 
 near :: Vec3 -> Vec3 -> Bool
 near a b = len (a - b) < 0.0001
@@ -78,3 +82,51 @@ main = hspec $ do
         let r@Ray { x0, u } = computeInitialRay c 0 0
         x0 `shouldSatisfy` near origin
         r `shouldSatisfy` passesThrough (origin + Vec3 1 0.5 0.5)
+
+  describe "Shapes" $ do
+    describe "Triangle" $ do
+      let tc = Shapes.collideTriangle (1::Int) (Vec3 0 0 5) (Vec3 2 0 5) (Vec3 1 2 5)
+
+      it "reflects rays intersecting with it" $ do
+        let testPoint x y = do
+              let mhit = tc (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1 })
+              mhit `shouldSatisfy` isJust
+              let Just hit = mhit
+              point hit `shouldSatisfy` near (Vec3 x y 5)
+              normal hit `shouldSatisfy` near (Vec3 0 0 (-1))
+              what hit `shouldBe` (1 :: Int)
+        testPoint 1 1
+        testPoint 0.1 0.1
+        testPoint 0.9 0.1
+
+      it "does not reflect rays not intersecting with it" $ do
+        let testPoint x y = do
+              let mhit = tc (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1 })
+              mhit `shouldSatisfy` isNothing
+        testPoint 0 1
+        testPoint (-0.1) 1
+        testPoint 2 1
+  describe "Scene" $ do
+    describe "TriangleMesh" $ do
+      it "gets expanded to a list of triangles" $ do
+        let tm = Scene.TriangleMesh {
+                   Scene.triangleMeshPoints = [
+                     Vec3 0 0 0, Vec3 0 0 1,
+                     Vec3 0 1 0, Vec3 0 1 1
+                     ],
+                   Scene.triangleMeshTriangles = [
+                     (0, 1, 2), (1, 2, 3)
+                     ],
+                   Scene.materialId = "fooMaterial"
+                   }
+            [expandedT1, expandedT2] = Scene.expand tm
+
+        Scene.p0 expandedT1 `shouldSatisfy` near (Vec3 0 0 0)
+        Scene.p1 expandedT1 `shouldSatisfy` near (Vec3 0 0 1)
+        Scene.p2 expandedT1 `shouldSatisfy` near (Vec3 0 1 0)
+        Scene.p0 expandedT2 `shouldSatisfy` near (Vec3 0 0 1)
+        Scene.p1 expandedT2 `shouldSatisfy` near (Vec3 0 1 0)
+        Scene.p2 expandedT2 `shouldSatisfy` near (Vec3 0 1 1)
+
+        Scene.materialId expandedT1 `shouldBe` "fooMaterial"
+        Scene.materialId expandedT2 `shouldBe` "fooMaterial"
