@@ -37,6 +37,24 @@ collidePlane shader origin normal (Ray {x0, u}) =
       else Nothing
 
 
+collideTriangle :: a -> Vec3 -> Vec3 -> Vec3 -> Collider a
+collideTriangle shader p0 p1 p2 (Ray {x0, u}) =
+  let e1 = p1 - p0
+      e2 = p2 - p0
+      s = x0 - p0
+      s1 = u `cross` e2
+      s2 = s `cross` e1
+      invDiv = 1 / (s1 .* e1)
+      t = s2 .* e2 * invDiv
+      b1 = s1 .* s * invDiv
+      b2 = s2 .* u * invDiv
+      b0 = 1 - b1 - b2
+  in  if   b0 >= 0 && b0 <= 1 && b1 >= 0 && b1 <= 1 && b2 >= 0 && b2 <= 1 && t > 0
+      then Just (Hit { point = x0 + t @* u, normal = norm $ e2 `cross` e1,
+                       what = shader })
+      else Nothing
+
+
 collideAll :: [Collider a] -> Collider a
 collideAll colliders ray =
   headMay $

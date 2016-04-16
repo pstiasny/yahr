@@ -1,6 +1,6 @@
 Scene {
   camera = Camera { imW = 1024, imH = 768,
-                    focalLength = 1,
+                    focalLength = 1.5,
                     lookDir = Vec3 0.4 -0.3 1,
                     upDir = Vec3 0 1 0,
                     position = Vec3 -4 3 2 },
@@ -51,6 +51,10 @@ Scene {
               Sphere { position = Vec3 3 (-1.2) 10,
                        radius = 1,
                        materialId = "sphere" },
+              Triangle { p0 = Vec3 -1 0 10,
+                         p1 = Vec3 1 0 10,
+                         p2 = Vec3 0 0 12,
+                         materialId = "back" },
               Plane { position = Vec3 0 (-2.2) 0,
                       planeNormal = Vec3 0 1 0,
                       materialId = "bottom" },

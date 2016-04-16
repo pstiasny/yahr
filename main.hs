@@ -16,9 +16,11 @@ import Shaders
 collideScene :: S.Scene -> Collider Shader
 collideScene s = collideAll sceneColliders
   where
-    sceneColliders = [collideSceneObject o | o <- S.objects s]
+    sceneObjects = S.objects s >>= S.expand
+    sceneColliders = [collideSceneObject o | o <- sceneObjects]
     collideSceneObject (S.Sphere p r mId) = collideSphere (sh mId) r p
     collideSceneObject (S.Plane p n mId) = collidePlane (sh mId) p n
+    collideSceneObject (S.Triangle p0 p1 p2 mId) = collideTriangle (sh mId) p0 p1 p2
     sh mId = mats ! mId
     mats :: Map String Shader
     mats = fromList [(S.id m, shaderForMat m) | m <- S.materials s]
