@@ -10,17 +10,36 @@ import qualified Scene as S
 import Shapes
 import Cameras
 import Shaders
+import qualified AABBs as BB
 
+
+bvh :: [(BB.BoundingBox, Collider a)] -> Collider a
+bvh [] = const Nothing
+bvh xs = snd $ buildTree xs
+  where
+    buildTree :: [(BB.BoundingBox, Collider a)] -> (BB.BoundingBox, Collider a)
+    buildTree [(bb, x)] = (bb, BB.wrapCollider x bb)
+    buildTree xs = (jointBB, BB.wrapCollider (collideAll [x1, x2]) jointBB)
+      where jointBB = BB.join bb1 bb2
+            (bb1, x1) = buildTree xs1
+            (bb2, x2) = buildTree xs2
+            (xs1, xs2) = splitAt (length xs `div` 2) xs
 
 
 collideScene :: S.Scene -> Collider Shader
-collideScene s = collideAll sceneColliders
+collideScene s = bvh $ zip sceneObjBounds sceneColliders
   where
     sceneObjects = S.objects s >>= S.expand
-    sceneColliders = [collideSceneObject o | o <- sceneObjects]
+
+    sceneColliders = map collideSceneObject sceneObjects
     collideSceneObject (S.Sphere p r mId) = collideSphere (sh mId) r p
     collideSceneObject (S.Plane p n mId) = collidePlane (sh mId) p n
     collideSceneObject (S.Triangle p0 p1 p2 mId) = collideTriangle (sh mId) p0 p1 p2
+
+    sceneObjBounds = map boundSceneObject sceneObjects
+    boundSceneObject (S.Sphere p r mId) = boundSphere r p
+    boundSceneObject (S.Triangle p0 p1 p2 mId) = boundTriangle p0 p1 p2
+
     sh mId = mats ! mId
     mats :: Map String Shader
     mats = fromList [(S.id m, shaderForMat m) | m <- S.materials s]

@@ -59,3 +59,9 @@ maxDimension (Vec3 x y z)
   | x > y && x > z = X
   | y > z = Y
   | otherwise = Z
+
+vmap :: (Float -> Float) -> Vec3 -> Vec3
+vmap f (Vec3 x y z) = Vec3 (f x) (f y) (f z)
+
+vzip :: (Float -> Float -> Float) -> Vec3 -> Vec3 -> Vec3
+vzip f (Vec3 ax ay az) (Vec3 bx by bz) = Vec3 (f ax bx) (f ay by) (f az bz)

@@ -2,17 +2,11 @@
 
 module Shapes where
 
-import Data.List (sortOn)
-import Data.Maybe (isJust, fromJust)
+import Data.Maybe (listToMaybe)
 
 import Vectors
 import Rays
-
-
-
-headMay :: [a] -> Maybe a
-headMay [] = Nothing
-headMay (h:_) = Just h
+import qualified AABBs as BB
 
 
 collideSphere :: a -> Float -> Vec3 -> Collider a
@@ -25,8 +19,12 @@ collideSphere shader r s (Ray {x0, u}) =
       ts = if delta < 0 then [] else [ (- b - sqrt delta) / (2 * a)
                                      , (- b + sqrt delta) / (2 * a) ]
       xs = [ x0 + t @* u | t <- ts, t > 0 ]
-  in  headMay [Hit { point = x, normal = norm $ x - s, what = shader }
-              | x <- xs]
+  in  listToMaybe [Hit { point = x, normal = norm $ x - s, what = shader }
+                  | x <- xs]
+
+
+boundSphere :: Float -> Vec3 -> BB.BoundingBox
+boundSphere r s = BB.fromPoints (s + unitv r) (s - unitv r)
 
 
 collidePlane :: a -> Vec3 -> Vec3 -> Collider a
@@ -55,12 +53,5 @@ collideTriangle shader p0 p1 p2 (Ray {x0, u}) =
       else Nothing
 
 
-collideAll :: [Collider a] -> Collider a
-collideAll colliders ray =
-  headMay $
-    sortOn (lensq . (x0 ray -) . point) $
-    map fromJust $
-    filter isJust $
-    map ($ ray) colliders
-
-
+boundTriangle :: Vec3 -> Vec3 -> Vec3 -> BB.BoundingBox
+boundTriangle p0 p1 p2 = BB.includePoint (BB.fromPoints p0 p1) p2
