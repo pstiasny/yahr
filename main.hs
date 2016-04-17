@@ -20,7 +20,6 @@ collideScene s = bvh $ zip sceneObjBounds sceneColliders
 
     sceneColliders = map collideSceneObject sceneObjects
     collideSceneObject (S.Sphere p r mId) = collideSphere (sh mId) r p
-    collideSceneObject (S.Plane p n mId) = collidePlane (sh mId) p n
     collideSceneObject (S.Triangle p0 p1 p2 mId) = collideTriangle (sh mId) p0 p1 p2
 
     sceneObjBounds = map boundSceneObject sceneObjects

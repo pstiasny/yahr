@@ -27,14 +27,6 @@ boundSphere :: Float -> Vec3 -> BB.BoundingBox
 boundSphere r s = BB.fromPoints (s + vof r) (s - vof r)
 
 
-collidePlane :: a -> Vec3 -> Vec3 -> Collider a
-collidePlane shader origin normal (Ray {x0, u}) =
-  let t = (normal .* (origin - x0)) / (normal .* u)
-  in  if   t > 0
-      then Just (Hit { point = x0 + t @* u, normal = normal, what = shader })
-      else Nothing
-
-
 collideTriangle :: a -> Vec3 -> Vec3 -> Vec3 -> Collider a
 collideTriangle shader p0 p1 p2 (Ray {x0, u}) =
   let e1 = p1 - p0
