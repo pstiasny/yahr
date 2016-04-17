@@ -14,11 +14,6 @@ data SceneObject =
        radius :: Float,
        materialId :: String
      } 
-   | Plane {
-       position :: Vec3,
-       planeNormal :: Vec3,
-       materialId :: String
-     }
    | Triangle {
        p0 :: Vec3,
        p1 :: Vec3,
