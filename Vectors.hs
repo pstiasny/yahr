@@ -1,22 +1,29 @@
 module Vectors where
 
-data Vec3 = Vec3 Float Float Float deriving (Read, Show)
+data Vec3 = Vec3 {-# UNPACK #-}!Float {-# UNPACK #-}!Float {-# UNPACK #-}!Float
+            deriving (Read, Show)
+
+type Color = Vec3
+type Light = Vec3
+type Normal = Vec3
+
+vmap :: (Float -> Float) -> Vec3 -> Vec3
+vmap f (Vec3 x y z) = Vec3 (f x) (f y) (f z)
+
+vzip :: (Float -> Float -> Float) -> Vec3 -> Vec3 -> Vec3
+vzip f (Vec3 ax ay az) (Vec3 bx by bz) = Vec3 (f ax bx) (f ay by) (f az bz)
+
+vof :: Float -> Vec3
+vof l = Vec3 l l l
+
 instance Num Vec3 where
-  (Vec3 x1 x2 x3) + (Vec3 y1 y2 y3) = Vec3 (x1 + y1) (x2 + y2) (x3 + y3)
-  (Vec3 x1 x2 x3) - (Vec3 y1 y2 y3) = Vec3 (x1 - y1) (x2 - y2) (x3 - y3)
-  (Vec3 x1 x2 x3) * (Vec3 y1 y2 y3) = Vec3 (x1 * y1) (x2 * y2) (x3 * y3)
-  negate (Vec3 x1 x2 x3) = Vec3 (negate x1) (negate x2) (negate x3)
-  abs (Vec3 x1 x2 x3) = Vec3 (abs x1) (abs x2) (abs x3)
-  signum (Vec3 x1 x2 x3) = Vec3 (signum x1) (signum x2) (signum x3)
-  fromInteger i = Vec3 (fromInteger i) (fromInteger i) (fromInteger i)
-
-instance Fractional Vec3 where
-  (Vec3 x1 x2 x3) / (Vec3 y1 y2 y3) = Vec3 (x1 / y1) (x2 / y2) (x3 / y3)
-  recip (Vec3 x1 x2 x3) = Vec3 (recip x1) (recip x2) (recip x3)
-  fromRational i = Vec3 (fromRational i) (fromRational i) (fromRational i)
-
-unitv :: Float -> Vec3
-unitv l = Vec3 l l l
+  (+) = vzip (+)
+  (-) = vzip (-)
+  (*) = vzip (*)
+  negate = vmap negate
+  abs = vmap abs
+  signum = vmap signum
+  fromInteger i = vof (fromInteger i)
 
 (.*) :: Vec3 -> Vec3 -> Float
 (Vec3 x1 x2 x3) .* (Vec3 y1 y2 y3) = x1 * y1 + x2 * y2 + x3 * y3
@@ -29,7 +36,7 @@ len :: Vec3 -> Float
 len v = sqrt $ lensq v
 
 (@*) :: Float -> Vec3 -> Vec3
-f @* v = (unitv f) * v
+f @* v = (vof f) * v
 infixl 7 @*
 
 norm :: Vec3 -> Vec3
@@ -40,12 +47,6 @@ cross :: Vec3 -> Vec3 -> Vec3
   Vec3 (ay * bz - az * by)
        (az * bx - ax * bz)
        (ax * by - ay * bx)
-
-
-type Color = Vec3
-type Light = Vec3
-type Normal = Vec3
-
 
 data Dimension = X | Y | Z deriving (Show)
 
@@ -59,9 +60,3 @@ maxDimension (Vec3 x y z)
   | x > y && x > z = X
   | y > z = Y
   | otherwise = Z
-
-vmap :: (Float -> Float) -> Vec3 -> Vec3
-vmap f (Vec3 x y z) = Vec3 (f x) (f y) (f z)
-
-vzip :: (Float -> Float -> Float) -> Vec3 -> Vec3 -> Vec3
-vzip f (Vec3 ax ay az) (Vec3 bx by bz) = Vec3 (f ax bx) (f ay by) (f az bz)

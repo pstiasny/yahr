@@ -40,13 +40,13 @@ main = hspec $ do
   describe "Ray" $ do
     it "should hit nearest of available collision candidates" $ do
       let n = Vec3 0 0 (-1)
-          hit1 = Hit { point = unitv 1, normal = n, what = 1}
-          hit2 = Hit { point = unitv 2, normal = n, what = 2}
+          hit1 = Hit { point = vof 1, normal = n, what = 1}
+          hit2 = Hit { point = vof 2, normal = n, what = 2}
           colliders = [
             const Nothing,
             const (Just hit2),
             const (Just hit1) ]
-          ray = Ray { x0 = unitv 0, u = unitv 1 }
+          ray = Ray { x0 = vof 0, u = vof 1 }
           (Just hit) = collideAll colliders ray
       point hit `shouldSatisfy` near (Vec3 1 1 1)
       what hit `shouldBe` 1

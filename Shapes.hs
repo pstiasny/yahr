@@ -24,7 +24,7 @@ collideSphere shader r s (Ray {x0, u}) =
 
 
 boundSphere :: Float -> Vec3 -> BB.BoundingBox
-boundSphere r s = BB.fromPoints (s + unitv r) (s - unitv r)
+boundSphere r s = BB.fromPoints (s + vof r) (s - vof r)
 
 
 collidePlane :: a -> Vec3 -> Vec3 -> Collider a
