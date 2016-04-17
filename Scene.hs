@@ -30,6 +30,10 @@ data SceneObject =
        triangleMeshTriangles :: [(Int, Int, Int)],
        materialId :: String
      }
+   | Subsampled {
+       subsampleSize :: Float,
+       subsampledObjects :: [SceneObject]
+     }
 
    deriving (Read, Show)
     
@@ -49,9 +53,17 @@ data Scene = Scene { camera :: C.Camera,
                      objects :: [ SceneObject ]
                    } deriving (Read, Show)
 
+
 expand :: SceneObject -> [SceneObject]
 expand (TriangleMesh {triangleMeshPoints, triangleMeshTriangles, materialId}) =
   let points = A.fromList triangleMeshPoints
-      triangleOfPoints (i0, i1, i2) = Triangle (points A.! i0) (points A.! i1) (points A.! i2) materialId
+      triangleOfPoints (i0, i1, i2) = Triangle (points A.! i0) (points A.! i1)
+                                               (points A.! i2) materialId
   in  map triangleOfPoints triangleMeshTriangles
+expand (Subsampled { subsampledObjects, subsampleSize }) =
+  let ofHundred = ceiling (subsampleSize * 100)
+      pick [] = []
+      pick xs = picked ++ pick (drop (100 - ofHundred) rest)
+                  where (picked, rest) = splitAt ofHundred xs
+  in  pick (subsampledObjects >>= expand)
 expand x = [x]
