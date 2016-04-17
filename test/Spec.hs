@@ -9,6 +9,7 @@ import Cameras
 import qualified Shapes
 import qualified Scene
 import qualified AABBs
+import qualified Culling
 
 near :: Vec3 -> Vec3 -> Bool
 near a b = len (a - b) < 0.0001
@@ -201,3 +202,24 @@ main = hspec $ do
         `shouldSatisfy` isJust
       bbc (Ray { x0 = Vec3 15 19 39, u = norm $ Vec3 0 1 0.9 })
         `shouldSatisfy` isJust
+
+  describe "Culling" $ do
+    describe "BVH" $ do
+      let grid = [(i, j, k) | i <- [1..10], j <- [1..10], k <- [1,2]]
+          sphereCenters = [Vec3 (i*10) (j*10) (k*10) | (i,j,k) <- grid]
+          root = Culling.bvh $ [(Shapes.boundSphere 1 c, Shapes.collideSphere i 1 c)
+                               | (i, c) <- zip grid sphereCenters]
+
+      it "should propagate rays to correct shapes" $ do
+        let testRay x y i = do
+              let mhit = root (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1 })
+              mhit `shouldSatisfy` isJust
+              let Just hit = mhit
+              what hit `shouldBe` i
+        testRay 10 10 (1, 1, 1)
+        testRay 30 30 (3, 3, 1)
+        testRay 10 100 (1, 10, 1)
+        testRay 100 10 (10, 1, 1)
+        testRay 50 50 (5, 5, 1)
+
+        testRay 10.49 10.49 (1, 1, 1)

@@ -14,6 +14,11 @@ includePoint :: BoundingBox -> Vec3 -> BoundingBox
 includePoint (BoundingBox bMin bMax) x =
   BoundingBox (vzip min bMin x) (vzip max bMax x)
 
+boundAllPoints :: [Vec3] -> BoundingBox
+boundAllPoints [] = error "No bound for empty point set"
+boundAllPoints [x] = fromPoints x x
+boundAllPoints (x1:x2:t) = foldl includePoint (fromPoints x1 x2) t
+
 join :: BoundingBox -> BoundingBox -> BoundingBox
 join (BoundingBox min1 max1) (BoundingBox min2 max2) =
   BoundingBox (vzip min min1 min2) (vzip max max1 max2)
@@ -30,3 +35,9 @@ wrapCollider cf (BoundingBox bMin bMax) (r@Ray { x0, u }) =
         in  (max tNear tDimNear, min tFar tDimFar)
       (tNear, tFar) = foldl slabIntersection (0, 1e10) [X, Y, Z]
   in  if tNear > tFar then Nothing else cf r
+
+maxExtent :: BoundingBox -> Dimension
+maxExtent (BoundingBox pMin pMax) = maxDimension $ pMax - pMin
+
+centroid :: BoundingBox -> Vec3
+centroid (BoundingBox pMin pMax) = 0.5 @* pMin + 0.5 @* pMax

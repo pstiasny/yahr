@@ -10,20 +10,7 @@ import qualified Scene as S
 import Shapes
 import Cameras
 import Shaders
-import qualified AABBs as BB
-
-
-bvh :: [(BB.BoundingBox, Collider a)] -> Collider a
-bvh [] = const Nothing
-bvh xs = snd $ buildTree xs
-  where
-    buildTree :: [(BB.BoundingBox, Collider a)] -> (BB.BoundingBox, Collider a)
-    buildTree [(bb, x)] = (bb, BB.wrapCollider x bb)
-    buildTree xs = (jointBB, BB.wrapCollider (collideAll [x1, x2]) jointBB)
-      where jointBB = BB.join bb1 bb2
-            (bb1, x1) = buildTree xs1
-            (bb2, x2) = buildTree xs2
-            (xs1, xs2) = splitAt (length xs `div` 2) xs
+import Culling
 
 
 collideScene :: S.Scene -> Collider Shader
