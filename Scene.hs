@@ -6,6 +6,7 @@ import qualified Data.Vector as A
 
 import Vectors
 import qualified Cameras as C
+import qualified Culling
 
 
 data SceneObject =
@@ -42,7 +43,8 @@ data Material = BlinnPhongMaterial { id :: String,
 
 data SceneLight = PointLight Vec3 deriving (Read, Show)
 
-data Scene = Scene { camera :: C.Camera,
+data Scene = Scene { cullingMode :: Culling.CullingMode,
+                     camera :: C.Camera,
                      materials :: [ Material ],
                      lights :: [ SceneLight ],
                      objects :: [ SceneObject ]

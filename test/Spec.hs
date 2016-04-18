@@ -161,6 +161,7 @@ main = hspec $ do
         Scene.materialId expandedT1 `shouldBe` "fooMaterial"
         Scene.materialId expandedT2 `shouldBe` "fooMaterial"
 
+
   describe "AABB" $ do
     it "should bound two points" $ do
       let (AABBs.BoundingBox pMin pMax) = AABBs.fromPoints (Vec3 1 20 5)
@@ -204,23 +205,50 @@ main = hspec $ do
       bbc (Ray { x0 = Vec3 15 19 39, u = norm $ Vec3 0 1 0.9, tMax = 1e6 })
         `shouldSatisfy` isJust
 
+    it "should have the centroid in its middle" $ do
+      let bb = AABBs.BoundingBox (vof (-10)) (vof 10)
+      AABBs.centroid bb `shouldSatisfy` near (vof 0)
+
+
   describe "Culling" $ do
     describe "BVH" $ do
       let grid = [(i, j, k) | i <- [1..10], j <- [1..10], k <- [1,2]]
           sphereCenters = [Vec3 (i*10) (j*10) (k*10) | (i,j,k) <- grid]
-          root = Culling.bvh $ [(Shapes.boundSphere 1 c, Shapes.collideSphere i 1 c)
-                               | (i, c) <- zip grid sphereCenters]
 
-      it "should propagate rays to correct shapes" $ do
-        let testRay x y i = do
-              let mhit = root (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1, tMax = 1e6 })
-              mhit `shouldSatisfy` isJust
-              let Just hit = mhit
-              what hit `shouldBe` i
-        testRay 10 10 (1, 1, 1)
-        testRay 30 30 (3, 3, 1)
-        testRay 10 100 (1, 10, 1)
-        testRay 100 10 (10, 1, 1)
-        testRay 50 50 (5, 5, 1)
+      context "using SAH splitting" $ do
+        let cm = Culling.BVH 16 Culling.SurfaceAreaHeuristic
+            root = Culling.cull cm $ [(Shapes.boundSphere 1 c, Shapes.collideSphere i 1 c)
+                                     | (i, c) <- zip grid sphereCenters]
 
-        testRay 10.49 10.49 (1, 1, 1)
+        it "should propagate rays to correct shapes" $ do
+          let testRay x y i = do
+                let mhit = root (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1, tMax = 1e6 })
+                mhit `shouldSatisfy` isJust
+                let Just hit = mhit
+                what hit `shouldBe` i
+          testRay 10 10 (1, 1, 1)
+          testRay 30 30 (3, 3, 1)
+          testRay 10 100 (1, 10, 1)
+          testRay 100 10 (10, 1, 1)
+          testRay 50 50 (5, 5, 1)
+
+          testRay 10.49 10.49 (1, 1, 1)
+
+      context "using midpoint splitting" $ do
+        let cm = Culling.BVH 16 Culling.Midpoint
+            root = Culling.cull cm $ [(Shapes.boundSphere 1 c, Shapes.collideSphere i 1 c)
+                                     | (i, c) <- zip grid sphereCenters]
+
+        it "should propagate rays to correct shapes" $ do
+          let testRay x y i = do
+                let mhit = root (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1, tMax = 1e6 })
+                mhit `shouldSatisfy` isJust
+                let Just hit = mhit
+                what hit `shouldBe` i
+          testRay 10 10 (1, 1, 1)
+          testRay 30 30 (3, 3, 1)
+          testRay 10 100 (1, 10, 1)
+          testRay 100 10 (10, 1, 1)
+          testRay 50 50 (5, 5, 1)
+
+          testRay 10.49 10.49 (1, 1, 1)

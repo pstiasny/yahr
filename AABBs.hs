@@ -47,3 +47,7 @@ maxExtent (BoundingBox pMin pMax) = maxDimension $ pMax - pMin
 
 centroid :: BoundingBox -> Vec3
 centroid (BoundingBox pMin pMax) = 0.5 @* pMin + 0.5 @* pMax
+
+surf :: BoundingBox -> Float
+surf (BoundingBox bMin bMax) = 2 * (dx * dy + dx * dz + dy * dz)
+  where Vec3 dx dy dz = bMax - bMin

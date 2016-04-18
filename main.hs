@@ -12,10 +12,11 @@ import Shapes
 import Cameras
 import Shaders
 import Culling
+import AABBs (BoundingBox)
 
 
-collideScene :: S.Scene -> Collider Shader
-collideScene s = bvh $ zip sceneObjBounds sceneColliders
+buildCollisionModel :: S.Scene -> [(BoundingBox, Collider Shader)]
+buildCollisionModel s = zip sceneObjBounds sceneColliders
   where
     sceneObjects = S.objects s >>= S.expand
 
@@ -75,7 +76,7 @@ main = do
       sceneFile <- readFile $ args !! 0
 
       let scene = read sceneFile :: S.Scene
-          collider = collideScene scene
+          collider = cull (S.cullingMode scene) (buildCollisionModel scene)
 
           camera = S.camera scene
           caster = computeInitialRay camera
