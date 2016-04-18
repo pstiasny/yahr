@@ -1,4 +1,5 @@
 Scene {
+  cullingMode = BVH 16 Midpoint,
   camera = Camera { imW = 1024, imH = 768,
                     focalLength = 1.5,
                     lookDir = Vec3 0.4 -0.3 1,
