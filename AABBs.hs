@@ -5,7 +5,10 @@ import Vectors
 import Rays
 
 
-data BoundingBox = BoundingBox Vec3 Vec3
+data BoundingBox = BoundingBox Vec3 Vec3 deriving Show
+
+empty = BoundingBox (vof inf) (vof (-inf))
+  where inf = read "Infinity"
 
 fromPoints :: Vec3 -> Vec3 -> BoundingBox
 fromPoints x y = BoundingBox (vzip min x y) (vzip max x y)
@@ -23,8 +26,8 @@ join :: BoundingBox -> BoundingBox -> BoundingBox
 join (BoundingBox min1 max1) (BoundingBox min2 max2) =
   BoundingBox (vzip min min1 min2) (vzip max max1 max2)
 
-wrapCollider :: Collider a -> BoundingBox -> Collider a
-wrapCollider cf (BoundingBox bMin bMax) (r@Ray { x0, u }) =
+bbRayIntersection :: BoundingBox -> Ray -> Maybe Float
+bbRayIntersection (BoundingBox bMin bMax) (r@Ray { x0, u, tMax }) =
   let slabIntersection (tNear, tFar) dim =
         let ds = getDimension dim
             invRayDir = 1 / (ds u)
@@ -33,8 +36,11 @@ wrapCollider cf (BoundingBox bMin bMax) (r@Ray { x0, u }) =
             tDimNear = min t0 t1
             tDimFar  = max t0 t1
         in  (max tNear tDimNear, min tFar tDimFar)
-      (tNear, tFar) = foldl slabIntersection (0, 1e10) [X, Y, Z]
-  in  if tNear > tFar then Nothing else cf r
+      (tNear, tFar) = foldl slabIntersection (0, tMax) [X, Y, Z]
+  in  if tNear > tFar then Nothing else Just tNear
+
+wrapCollider :: Collider a -> BoundingBox -> Collider a
+wrapCollider cf bb r = bbRayIntersection bb r >>= \t -> cf r
 
 maxExtent :: BoundingBox -> Dimension
 maxExtent (BoundingBox pMin pMax) = maxDimension $ pMax - pMin

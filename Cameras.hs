@@ -83,4 +83,4 @@ computeInitialRay (Camera {imW, imH, focalLength, lookDir, upDir, position}) =
   in  \u v ->
     let origin = transformPoint tf (Vec3 0 0 0)
         direction = transformPoint vtf (Vec3 u v focalLength) - origin
-    in  Ray { x0 = origin, u = norm $ direction }
+    in  Ray { x0 = origin, u = norm $ direction, tMax = 1e6 }
