@@ -40,13 +40,13 @@ main = hspec $ do
   describe "Ray" $ do
     it "should hit nearest of available collision candidates" $ do
       let n = Vec3 0 0 (-1)
-          hit1 = Hit { point = vof 1, normal = n, what = 1}
-          hit2 = Hit { point = vof 2, normal = n, what = 2}
+          hit1 = Hit { rayT = 1, point = vof 1, normal = n, what = 1}
+          hit2 = Hit { rayT = 2, point = vof 2, normal = n, what = 2}
           colliders = [
             const Nothing,
             const (Just hit2),
             const (Just hit1) ]
-          ray = Ray { x0 = vof 0, u = vof 1 }
+          ray = Ray { x0 = vof 0, u = vof 1, tMax = 10 }
           (Just hit) = collideAll colliders ray
       point hit `shouldSatisfy` near (Vec3 1 1 1)
       what hit `shouldBe` 1
@@ -112,7 +112,7 @@ main = hspec $ do
 
       it "reflects rays intersecting with it" $ do
         let testPoint x y = do
-              let mhit = tc (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1 })
+              let mhit = tc (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1, tMax = 1e6 })
               mhit `shouldSatisfy` isJust
               let Just hit = mhit
               point hit `shouldSatisfy` near (Vec3 x y 5)
@@ -124,7 +124,7 @@ main = hspec $ do
 
       it "does not reflect rays not intersecting with it" $ do
         let testPoint x y = do
-              let mhit = tc (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1 })
+              let mhit = tc (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1, tMax = 1e6 })
               mhit `shouldSatisfy` isNothing
         testPoint 0 1
         testPoint (-0.1) 1
@@ -182,25 +182,26 @@ main = hspec $ do
       pMax `shouldSatisfy` near (Vec3 15 20 5)
 
     let bb = AABBs.BoundingBox (Vec3 10 20 30) (Vec3 20 30 40)
-        collideAny = const $ Just (Hit { point = Vec3 0 0 0,
+        collideAny = const $ Just (Hit { rayT = 0,
+                                         point = Vec3 0 0 0,
                                          normal = Vec3 0 0 (-1),
                                          what = True })
         bbc = AABBs.wrapCollider collideAny bb
 
     it "should not be hit by rays missing it" $ do
-      bbc (Ray { x0 = Vec3 9 29 35, u = norm $ Vec3 1 1.1 0 })
+      bbc (Ray { x0 = Vec3 9 29 35, u = norm $ Vec3 1 1.1 0, tMax = 1e6 })
         `shouldSatisfy` isNothing
-      bbc (Ray { x0 = Vec3 21 29 35, u = norm $ Vec3 (-1) 1.1 0 })
+      bbc (Ray { x0 = Vec3 21 29 35, u = norm $ Vec3 (-1) 1.1 0, tMax = 1e6 })
         `shouldSatisfy` isNothing
-      bbc (Ray { x0 = Vec3 15 19 39, u = norm $ Vec3 0 1 1.1 })
+      bbc (Ray { x0 = Vec3 15 19 39, u = norm $ Vec3 0 1 1.1, tMax = 1e6 })
         `shouldSatisfy` isNothing
 
     it "should propagate rays intersecting it" $ do
-      bbc (Ray { x0 = Vec3 9 29 35, u = norm $ Vec3 1 0.9 0 })
+      bbc (Ray { x0 = Vec3 9 29 35, u = norm $ Vec3 1 0.9 0, tMax = 1e6 })
         `shouldSatisfy` isJust
-      bbc (Ray { x0 = Vec3 21 29 35, u = norm $ Vec3 (-1) 0.9 0 })
+      bbc (Ray { x0 = Vec3 21 29 35, u = norm $ Vec3 (-1) 0.9 0, tMax = 1e6 })
         `shouldSatisfy` isJust
-      bbc (Ray { x0 = Vec3 15 19 39, u = norm $ Vec3 0 1 0.9 })
+      bbc (Ray { x0 = Vec3 15 19 39, u = norm $ Vec3 0 1 0.9, tMax = 1e6 })
         `shouldSatisfy` isJust
 
   describe "Culling" $ do
@@ -212,7 +213,7 @@ main = hspec $ do
 
       it "should propagate rays to correct shapes" $ do
         let testRay x y i = do
-              let mhit = root (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1 })
+              let mhit = root (Ray { x0 = Vec3 x y 0, u = Vec3 0 0 1, tMax = 1e6 })
               mhit `shouldSatisfy` isJust
               let Just hit = mhit
               what hit `shouldBe` i

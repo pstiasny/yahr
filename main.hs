@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+import Data.Maybe (isNothing)
 import Data.Map (Map, fromList, (!))
 import System.Environment
 import Codec.Picture
@@ -47,16 +48,15 @@ vcast maxDepth collide lights ray =
       where castNext n = vcast (maxDepth - 1)
                                collide
                                lights
-                               Ray {x0 = point + 0.001 @* n, u = n}
+                               Ray {x0 = point + 0.001 @* n, u = n, tMax = 1e6}
             visibleLights = filter isReachable lights
             isReachable light =
               let rayToLight = Ray {x0 = point + 0.001 @* hitNormal,
-                                    u = norm $ light - point}
+                                    u = norm $ light - point,
+                                    tMax = lightDist }
                   mhit = collide rayToLight
-                  lightDistSq = lensq (light - point)
-              in  case mhit of
-                    Just (Hit {point = lp}) -> lensq (lp - point) > lightDistSq
-                    Nothing -> True
+                  lightDist = len (light - point)
+              in  isNothing mhit
 
 
 getPixel :: Collider Shader -> [Light] -> (Float -> Float -> Ray) -> Int -> Int -> PixelRGBF
