@@ -5,11 +5,28 @@ import Data.List (sortOn)
 import Data.Maybe (catMaybes, listToMaybe)
 
 import Vectors
+import DifferentialGeometry
 
 -- Ray described by l(t) = x0 + t * u
 data Ray = Ray { x0 :: Vec3, u :: Vec3, tMax :: Float } deriving (Show)
 
-data Hit a = Hit { rayT :: Float, point :: Vec3, normal :: Vec3, what :: a } deriving Show
+{-data Hit a =-}
+  {-Hit { tHit :: Float, point :: Vec3, normal :: Vec3, what :: a }-}
+  {-deriving Show-}
+data Hit a = Hit Float DifferentialGeometry a deriving Show
+
+tHit :: Hit a -> Float
+tHit (Hit t _ _) = t
+
+point :: Hit a -> Vec3
+point (Hit _ dg _) = dgPoint dg
+
+normal :: Hit a -> Vec3
+normal (Hit _ dg _) = dgNormal dg
+
+what :: Hit a -> a
+what (Hit _ _ a) = a
+
 
 type Collider a = Ray -> Maybe (Hit a)
 
@@ -25,5 +42,5 @@ collideAll colliders ray =
   where
     collideWith (mhit, ray) collider =
       case collider ray of
-        Just (h@Hit { rayT }) -> (Just h, cutRay rayT ray)
+        Just h -> (Just h, cutRay (tHit h) ray)
         Nothing -> (mhit, ray)

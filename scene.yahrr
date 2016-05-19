@@ -1,4 +1,5 @@
 Scene {
+  integrator = WhittedIntegrator { recursionDepth = 3 },
   cullingMode = BVH 16 Midpoint,
   camera = Camera { imW = 1024, imH = 768,
                     focalLength = 1.5,
@@ -6,7 +7,7 @@ Scene {
                     upDir = Vec3 0 1 0,
                     position = Vec3 -4 3 2 },
   materials = [ BlinnPhongMaterial { id = "sphere",
-                                     ambient = Vec3 0 0 0,
+                                     ambient = Vec3 0.5 0 0,
                                      diffuse = Vec3 0.2 0.2 0.2,
                                      specular = Vec3 1 1 1,
                                      shininess = 10
@@ -59,7 +60,7 @@ Scene {
                                Vec3 -1000 -2.2 1000
                                ],
                              triangleMeshTriangles = [
-                               (0, 1, 2), (1, 2, 3)
+                               (0, 1, 2), (0, 2, 3)
                              ],
                              materialId = "bottom" }
             ]

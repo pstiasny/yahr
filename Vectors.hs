@@ -3,7 +3,7 @@ module Vectors where
 data Vec3 = Vec3 {-# UNPACK #-}!Float {-# UNPACK #-}!Float {-# UNPACK #-}!Float
             deriving (Read, Show)
 
-type Color = Vec3
+type Spectrum = Vec3
 type Light = Vec3
 type Normal = Vec3
 
