@@ -1,5 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
+import Control.Monad (forM_)
 import Data.Maybe (isJust, isNothing)
+import Data.List (sort)
 
 import Test.Hspec
 
@@ -10,6 +12,10 @@ import qualified Shapes
 import qualified Scene
 import qualified AABBs
 import qualified Culling
+import qualified BSDF
+import qualified Shaders
+import qualified Integrators
+import DifferentialGeometry
 
 near :: Vec3 -> Vec3 -> Bool
 near a b = len (a - b) < 0.0001
@@ -40,15 +46,14 @@ main = hspec $ do
   describe "Ray" $ do
     it "should hit nearest of available collision candidates" $ do
       let n = Vec3 0 0 (-1)
-          hit1 = Hit { rayT = 1, point = vof 1, normal = n, what = 1}
-          hit2 = Hit { rayT = 2, point = vof 2, normal = n, what = 2}
+          hit1 = Hit 1 undefined 1
+          hit2 = Hit 2 undefined 2
           colliders = [
             const Nothing,
             const (Just hit2),
             const (Just hit1) ]
           ray = Ray { x0 = vof 0, u = vof 1, tMax = 10 }
           (Just hit) = collideAll colliders ray
-      point hit `shouldSatisfy` near (Vec3 1 1 1)
       what hit `shouldBe` 1
 
   describe "Camera" $ do
@@ -183,10 +188,7 @@ main = hspec $ do
       pMax `shouldSatisfy` near (Vec3 15 20 5)
 
     let bb = AABBs.BoundingBox (Vec3 10 20 30) (Vec3 20 30 40)
-        collideAny = const $ Just (Hit { rayT = 0,
-                                         point = Vec3 0 0 0,
-                                         normal = Vec3 0 0 (-1),
-                                         what = True })
+        collideAny = const $ Just (Hit 0 undefined True)
         bbc = AABBs.wrapCollider collideAny bb
 
     it "should not be hit by rays missing it" $ do
@@ -252,3 +254,67 @@ main = hspec $ do
           testRay 50 50 (5, 5, 1)
 
           testRay 10.49 10.49 (1, 1, 1)
+
+
+  describe "Integrator" $ do
+    let bsdfTriangle bsdf = Shapes.collideTriangle mat p0 p1 p2
+          where mat = Shaders.Material (\_ _ -> bsdf)
+                p0 = Vec3 (-10) (-10) 0
+                p1 = Vec3 10 (-10) 0
+                p2 = Vec3 0 10 0
+        integrator = Integrators.WhittedIntegrator { Integrators.recursionDepth = 1 }
+        vec angle = Vec3 (cos angle) 0 (sin angle)
+        pt angle = negate $ vec angle
+        eye angle = Ray { x0 = pt angle, u = vec angle, tMax = 1e6 }
+
+        bsdf = BSDF.Blinn 10
+        collider = bsdfTriangle bsdf
+
+    it "should not reflect on the rear side" $ do
+      let ray = Ray { x0 = Vec3 0 0 (-1), u = Vec3 0 0 1, tMax = 1e6 }
+          light = Vec3 (cos (pi/4)) 0 (sin (pi/4))
+          rad = Integrators.radiance integrator [light] collider ray
+      rad `shouldSatisfy` near (vof 0)
+
+      let ray = eye (1.5*pi)
+          light = pt (0.25*pi)
+          rad = Integrators.radiance integrator [light] collider ray
+      rad `shouldSatisfy` near (vof 0)
+
+    it "should reflect the most when incident angle equals reflected angle" $ do
+      let ray = eye (0.25*pi)
+          lights = [pt angle | angle <- [0.25*pi, 0.50*pi, 0.75*pi]]
+          rads = [lensq $ Integrators.radiance integrator [light] collider ray
+                 | light <- lights]
+      rads `shouldBe` sort rads
+
+
+  describe "BSDF" $ do
+    let vec angle = Vec3 (cos angle) 0 (sin angle)
+        dg = DifferentialGeometry {
+               dgPoint = Vec3 0 0 0,
+               dgNormal = Vec3 0 0 1,
+               dgDPDU = Vec3 1 0 0,
+               dgDPDV = Vec3 0 1 0
+             }
+
+    describe "Blinn" $ do
+      let bsdf = BSDF.Blinn 10
+
+      it "should not reflect on the rear side" $ do
+        let eye = vec (7*pi/4)
+            light = vec (5*pi/4)
+            f = BSDF.at bsdf dg light eye
+        f `shouldSatisfy` near (vof 0)
+
+      it "should not transmit" $ do
+        let eye = vec (0.25 * pi)
+            light = vec (1.25 * pi)
+        forM_ [1.25 * pi, 1.5 * pi, 1.75 * pi] $ \lightAngle ->
+          BSDF.at bsdf dg (vec lightAngle) eye `shouldSatisfy` near (vof 0)
+
+      it "should reflect the most when incident angle equals reflected angle" $ do
+        let eye = vec (0.25 * pi)
+            lights = [vec angle | angle <- [0.25 * pi, 0.50 * pi, 0.75 * pi, 0.9*pi]]
+            fs = [lensq $ BSDF.at bsdf dg light eye | light <- lights]
+        fs `shouldBe` sort fs

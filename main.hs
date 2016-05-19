@@ -1,6 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-import Data.Maybe (isNothing)
 import Data.Map (Map, fromList, (!))
 import System.Environment
 import Codec.Picture
@@ -13,57 +12,34 @@ import Cameras
 import Shaders
 import Culling
 import AABBs (BoundingBox)
+import Integrators (radiance)
 
 
-buildCollisionModel :: S.Scene -> [(BoundingBox, Collider Shader)]
+buildCollisionModel :: S.Scene -> [(BoundingBox, Collider Material)]
 buildCollisionModel s = zip sceneObjBounds sceneColliders
   where
     sceneObjects = S.objects s >>= S.expand
 
     sceneColliders = map collideSceneObject sceneObjects
-    collideSceneObject (S.Sphere p r mId) = collideSphere (sh mId) r p
-    collideSceneObject (S.Triangle p0 p1 p2 mId) = collideTriangle (sh mId) p0 p1 p2
+    collideSceneObject (S.Sphere p r mId) = collideSphere (mat mId) r p
+    collideSceneObject (S.Triangle p0 p1 p2 mId) = collideTriangle (mat mId) p0 p1 p2
 
     sceneObjBounds = map boundSceneObject sceneObjects
     boundSceneObject (S.Sphere p r mId) = boundSphere r p
     boundSceneObject (S.Triangle p0 p1 p2 mId) = boundTriangle p0 p1 p2
 
-    sh mId = mats ! mId
+    mat mId = Material (mats ! mId)
     mats :: Map String Shader
-    mats = fromList [(S.id m, shaderForMat m) | m <- S.materials s]
-    shaderForMat mat = case mat of
+    mats = fromList [(S.id m, shaderFromDescription m) | m <- S.materials s]
+    shaderFromDescription desc = case desc of
       S.BlinnPhongMaterial id ambient diffuse specular shininess ->
         blinnPhong ambient diffuse specular shininess
 
 
-vcast :: Int -> Collider Shader -> [Light] -> Ray -> Color
-vcast 0 _ _ _ = (Vec3 0 0 0)
-vcast maxDepth collide lights ray =
-  case collide ray of
-    Nothing -> Vec3 0 0 0
-    Just hit@Hit {point, normal = hitNormal, what = shader} ->
-      shader (ShaderInput { ray = ray,
-                            hit = hit,
-                            lights = visibleLights,
-                            cast = castNext })
-      where castNext n = vcast (maxDepth - 1)
-                               collide
-                               lights
-                               Ray {x0 = point + 0.001 @* n, u = n, tMax = 1e6}
-            visibleLights = filter isReachable lights
-            isReachable light =
-              let rayToLight = Ray {x0 = point + 0.001 @* hitNormal,
-                                    u = norm $ light - point,
-                                    tMax = lightDist }
-                  mhit = collide rayToLight
-                  lightDist = len (light - point)
-              in  isNothing mhit
-
-
-getPixel :: Collider Shader -> [Light] -> (Float -> Float -> Ray) -> Int -> Int -> PixelRGBF
-getPixel collide lights cast x y =
+getPixel :: (Float -> Float -> Ray) -> (Ray -> Spectrum) -> Int -> Int -> PixelRGBF
+getPixel cast li x y =
   let ray = cast (fromIntegral x) (fromIntegral y)
-      Vec3 r g b = vcast 3 collide lights ray
+      Vec3 r g b = li ray
   in  PixelRGBF r g b
 
 
@@ -85,5 +61,7 @@ main = do
 
           lights = [v | S.PointLight v <- S.lights scene]
 
-          img = generateImage (getPixel collider lights caster) width height
+          li = radiance (S.integrator scene) lights collider
+          img = generateImage (getPixel caster li) width height
+
       savePngImage (args !! 1) (ImageRGBF img)
