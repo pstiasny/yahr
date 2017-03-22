@@ -1,6 +1,10 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+import Control.Monad (forM_)
 import Data.Map (Map, fromList, (!))
+import Data.Tuple (swap)
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 import System.Environment
 import Codec.Picture
 
@@ -35,13 +39,43 @@ buildCollisionModel s = zip sceneObjBounds sceneColliders
       S.BlinnPhongMaterial id ambient diffuse specular shininess ->
         blinnPhong ambient diffuse specular shininess
 
+spectrumToPixel :: Spectrum -> PixelRGBF
+spectrumToPixel (Vec3 r g b) = PixelRGBF r g b
 
-getPixel :: (Float -> Float -> Ray) -> (Ray -> Spectrum) -> Int -> Int -> PixelRGBF
-getPixel cast li x y =
-  let ray = cast (fromIntegral x) (fromIntegral y)
-      Vec3 r g b = li ray
-  in  PixelRGBF r g b
+render :: Int -> Int -> [(Int, Int)] ->
+          (Float -> Float -> Ray) -> (Ray -> Spectrum) ->
+          Int -> Int -> PixelRGBF
+render w h samples cast li =
+  let uvToIndex u v = w * v + u
+      image = V.create $ do
+        img <- MV.new (w * h)
+        forM_ samples $ \(u,v) ->
+          let ray = cast (fromIntegral u) (fromIntegral v)
+              spectrum = li ray
+          in  MV.write img (uvToIndex u v) spectrum
+        return img
+  in  \u v -> spectrumToPixel $ image V.! (uvToIndex u v)
 
+scannySamplePoints w h = [(u, v) | u <- [0..w-1], v <- [0..h-1]]
+
+patchySamplePoints w h =
+  (concat $ [shift x y $ scannySamplePoints patchW patchH
+            | x <- [0..patchCountX - 1], y <- [0..patchCountY - 1]])
+  ++
+  (concat $ [shift patchCountX y $ scannySamplePoints lastPatchW patchH
+            | y <- [0..patchCountY - 1]])
+  ++
+  (concat $ [shift x patchCountY $ scannySamplePoints patchW lastPatchH
+            | x <- [0..patchCountX - 1]])
+  ++
+  (shift patchCountX patchCountY $ scannySamplePoints lastPatchW lastPatchH)
+
+  where patchW = 20
+        patchH = 20
+        (patchCountX, lastPatchW) = w `quotRem` patchW
+        (patchCountY, lastPatchH) = h `quotRem` patchH
+        shift x y samples = [(u + x * patchW, v + y * patchH)
+                            | (u, v) <- samples]
 
 main = do
   args <- getArgs
@@ -62,6 +96,9 @@ main = do
           lights = [v | S.PointLight v <- S.lights scene]
 
           li = radiance (S.integrator scene) lights collider
-          img = generateImage (getPixel caster li) width height
+          {-samplePoints = patchySamplePoints width height-}
+          samplePoints = scannySamplePoints width height
+          sampleImg = render width height samplePoints caster li
+          img = generateImage sampleImg width height
 
       savePngImage (args !! 1) (ImageRGBF img)
