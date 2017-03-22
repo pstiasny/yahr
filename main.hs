@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 import Control.Monad (forM_)
+import Data.Functor.Identity (runIdentity)
 import Data.Map (Map, fromList, (!))
 import Data.Tuple (swap)
 import qualified Data.Vector as V
@@ -95,7 +96,7 @@ main = do
 
           lights = [v | S.PointLight v <- S.lights scene]
 
-          li = radiance (S.integrator scene) lights collider
+          li = (runIdentity . radiance (S.integrator scene) lights collider)
           {-samplePoints = patchySamplePoints width height-}
           samplePoints = scannySamplePoints width height
           sampleImg = render width height samplePoints caster li

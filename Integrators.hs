@@ -14,19 +14,22 @@ data IntegratorSpec =
   WhittedIntegrator { recursionDepth :: Int }
   deriving (Read, Show)
 
-radiance :: IntegratorSpec -> [Light] -> Collider Material -> Ray -> Spectrum
+radiance :: (Monad m) => IntegratorSpec -> [Light] -> Collider Material -> Ray -> m Spectrum
 radiance spec lights rootCollider ray = vcast (recursionDepth spec) ray
   where
-    vcast 0 _ = (Vec3 0 0 0)
+    vcast :: (Monad m) => Int -> Ray -> m Vec3
+    vcast 0 _ = return (Vec3 0 0 0)
     vcast maxDepth ray =
       case rootCollider ray of
-        Nothing -> Vec3 0 0 0
+        Nothing -> return (Vec3 0 0 0)
         Just hit@(Hit tHit
                       dg@DifferentialGeometry { dgPoint = point,
                                                 dgNormal = hitNormal }
                       (Material shader)) ->
-          (hitNormal .* reflectionDir) @* f reflectionDir * castNext reflectionDir +
-            sum (map lightContribution lights)
+          do
+            next <- castNext reflectionDir
+            return $ (hitNormal .* reflectionDir) @* f reflectionDir * next +
+              sum (map lightContribution lights)
           where bsdf = shader ray hit
                 f omegai = BSDF.at bsdf dg omegai (negate (u ray))
                 lightContribution lightPos =
