@@ -1,7 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 import Control.Monad (forM_)
-import Data.Functor.Identity (runIdentity)
+import Control.Parallel.Strategies (Eval, rpar, runEval)
+import Data.Functor.Identity (Identity, runIdentity)
 import Data.Map (Map, fromList, (!))
 import Data.Tuple (swap)
 import qualified Data.Vector as V
@@ -43,17 +44,36 @@ buildCollisionModel s = zip sceneObjBounds sceneColliders
 spectrumToPixel :: Spectrum -> PixelRGBF
 spectrumToPixel (Vec3 r g b) = PixelRGBF r g b
 
+type ImageF = Int -> Int -> PixelRGBF
+
 render :: Int -> Int -> [(Int, Int)] ->
-          (Float -> Float -> Ray) -> (Ray -> Spectrum) ->
-          Int -> Int -> PixelRGBF
+          (Float -> Float -> Ray) -> (Ray -> Identity Spectrum) ->
+          ImageF
 render w h samples cast li =
   let uvToIndex u v = w * v + u
       image = V.create $ do
         img <- MV.new (w * h)
         forM_ samples $ \(u,v) ->
           let ray = cast (fromIntegral u) (fromIntegral v)
-              spectrum = li ray
+              spectrum = runIdentity $ li ray
           in  MV.write img (uvToIndex u v) spectrum
+        return img
+  in  \u v -> spectrumToPixel $ image V.! (uvToIndex u v)
+
+renderEval :: Int -> Int -> [(Int, Int)] ->
+              (Float -> Float -> Ray) -> (Ray -> Eval Spectrum) ->
+              ImageF
+renderEval w h samples cast li =
+  let uvToIndex u v = w * v + u
+      image = V.create $ do
+        img <- MV.new (w * h)
+        let evals :: [Eval Spectrum]
+            evals = [ li (cast (fromIntegral u) (fromIntegral v)) >>= rpar
+                    | (u, v) <- samples ]
+            uvSpectra :: [((Int, Int), Spectrum)]
+            uvSpectra = zip samples $ runEval $ sequence evals
+        forM_ uvSpectra $ \((u, v), spectrum) ->
+          MV.write img (uvToIndex u v) spectrum
         return img
   in  \u v -> spectrumToPixel $ image V.! (uvToIndex u v)
 
@@ -80,11 +100,16 @@ patchySamplePoints w h =
 
 main = do
   args <- getArgs
-  if length args /= 2
+  if length args < 2
     then
       putStrLn "usage: yahr <input file> <output file>"
     else do
-      sceneFile <- readFile $ args !! 0
+      let fileNames (i:o:[]) = (i, o)
+          fileNames (_:t) = fileNames t
+          (sceneFileName, outputFileName) = fileNames args
+          parallelOn = "--parallel-eval" `elem` args
+
+      sceneFile <- readFile sceneFileName
 
       let scene = read sceneFile :: S.Scene
           collider = cull (S.cullingMode scene) (buildCollisionModel scene)
@@ -96,10 +121,13 @@ main = do
 
           lights = [v | S.PointLight v <- S.lights scene]
 
-          li = (runIdentity . radiance (S.integrator scene) lights collider)
-          {-samplePoints = patchySamplePoints width height-}
+          li :: (Monad m) => Ray -> m Spectrum
+          li = radiance (S.integrator scene) lights collider
           samplePoints = scannySamplePoints width height
-          sampleImg = render width height samplePoints caster li
+          sampleImg =
+            if parallelOn
+              then renderEval width height samplePoints caster li
+              else render width height samplePoints caster li
           img = generateImage sampleImg width height
 
-      savePngImage (args !! 1) (ImageRGBF img)
+      savePngImage outputFileName (ImageRGBF img)
