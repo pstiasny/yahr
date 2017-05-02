@@ -22,30 +22,44 @@ radiance spec lights rootCollider ray = vcast (recursionDepth spec) ray
     vcast maxDepth ray =
       case rootCollider ray of
         Nothing -> return (Vec3 0 0 0)
-        Just hit@(Hit tHit
-                      dg@DifferentialGeometry { dgPoint = point,
-                                                dgNormal = hitNormal }
-                      (Material shader)) ->
-          do
-            next <- castNext reflectionDir
-            return $ (hitNormal .* reflectionDir) @* f reflectionDir * next +
-              sum (map lightContribution lights)
-          where bsdf = shader ray hit
-                f omegai = BSDF.at bsdf dg omegai (negate (u ray))
-                lightContribution lightPos =
-                  let lightDir = norm $ lightPos - point
-                      k = f lightDir
-                      reachable = isReachable lightPos
-                  in  if lensq k > 0 && reachable
-                        then abs (lightDir .* hitNormal) @* k -- TODO: light spectrum, intensity
-                        else vof 0
-                castNext n = vcast (maxDepth - 1)
-                                   Ray {x0 = point + 0.001 @* n, u = n, tMax = 1e6}
-                isReachable light =
-                  let rayToLight = Ray {x0 = point + 0.001 @* hitNormal,
-                                        u = norm $ light - point,
-                                        tMax = lightDist}
-                      mhit = rootCollider rayToLight
-                      lightDist = len (light - point)
-                  in  isNothing mhit
-                reflectionDir = (u ray) - 2 * ((u ray) .* hitNormal) @* hitNormal
+        Just hit -> vhit maxDepth ray hit
+
+    vhit maxDepth
+         ray
+         hit@(Hit tHit
+                  dg@DifferentialGeometry { dgPoint = x, dgNormal = n }
+                  (Material shader)) =
+      do
+        rs <- vcast (maxDepth - 1)
+                    Ray { x0 = x + 0.001 @* r, u = r, tMax = 1e6 }
+        return $
+          (n .* r) @* f r * rs +
+          directIllumination rootCollider dg ray lights bsdf
+      where bsdf = shader ray hit
+            f omegai = BSDF.at bsdf dg omegai (negate (u ray))
+            r = reflectionDir (u ray) n
+
+
+reflectionDir :: Vec3 -> Vec3 -> Vec3
+reflectionDir u n = u - 2 * (u .* n) @* n
+
+
+reachable :: Collider a -> Vec3 -> Vec3 -> Bool
+reachable rc p0 p1 = isNothing (rc probe)
+  where probe = Ray { x0 = p0
+                    , u = norm $ p1 - p0
+                    , tMax = len (p1 - p0)
+                    }
+
+
+directIllumination :: Collider a -> DifferentialGeometry -> Ray -> [Light] -> BSDF.BSDF -> Spectrum
+directIllumination rc dg ray lights bsdf = sum (map lightContribution lights)
+  where
+    x = dgPoint dg
+    n = dgNormal dg
+    lightContribution lightPos =
+      let lightDir = norm $ lightPos - x
+          k = BSDF.at bsdf dg lightDir (negate (u ray))
+      in  if lensq k > 0 && reachable rc (x + 0.001 @* lightDir) lightPos
+            then abs (lightDir .* n) @* k
+            else vof 0

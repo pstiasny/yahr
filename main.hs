@@ -123,7 +123,9 @@ main = do
 
           li :: (Monad m) => Ray -> m Spectrum
           li = radiance (S.integrator scene) lights collider
+
           samplePoints = scannySamplePoints width height
+
           sampleImg =
             if parallelOn
               then renderEval width height samplePoints caster li
