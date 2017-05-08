@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+import Control.Concurrent (getNumCapabilities)
 import Control.Monad (forM_)
 import Control.Parallel.Strategies (Eval, rpar, runEval)
 import Data.Functor.Identity (Identity, runIdentity)
@@ -19,6 +20,7 @@ import Shaders
 import Culling
 import AABBs (BoundingBox)
 import Integrators (radiance)
+import Sampling (lineBatches, squareBatches)
 
 
 buildCollisionModel :: S.Scene -> [(BoundingBox, Collider Material)]
@@ -44,61 +46,42 @@ buildCollisionModel s = zip sceneObjBounds sceneColliders
 spectrumToPixel :: Spectrum -> PixelRGBF
 spectrumToPixel (Vec3 r g b) = PixelRGBF r g b
 
-type ImageF = Int -> Int -> PixelRGBF
+type SampleCoordinates = (Int, Int)
+type Sample = (SampleCoordinates, Spectrum)
 
-render :: Int -> Int -> [(Int, Int)] ->
-          (Float -> Float -> Ray) -> (Ray -> Identity Spectrum) ->
-          ImageF
-render w h samples cast li =
+render :: Int -> Int -> [[SampleCoordinates]] ->
+          (Float -> Float -> Ray) -> (Ray -> Spectrum) ->
+          [Sample]
+render w h batches cast li = concat $ map (map sample) batches
+  where
+    sample (u, v) = ((u, v), li $ cast (fromIntegral u) (fromIntegral v))
+
+renderEval :: Int -> Int -> [[SampleCoordinates]] ->
+              (Float -> Float -> Ray) -> (Ray -> Spectrum) ->
+              [Sample]
+renderEval w h batches cast li =
+  let batch coords = [ ((u, v), li (cast (fromIntegral u) (fromIntegral v)))
+                     | (u, v) <- coords ]
+      evals :: [Eval [Sample]]
+      evals = [ rpar (batch coords) | coords <- batches ]
+  in  concat $ runEval $ sequence evals
+
+samplesToImage :: Int -> Int -> [Sample] -> Image PixelRGBF
+samplesToImage w h samples =
   let uvToIndex u v = w * v + u
       image = V.create $ do
         img <- MV.new (w * h)
-        forM_ samples $ \(u,v) ->
-          let ray = cast (fromIntegral u) (fromIntegral v)
-              spectrum = runIdentity $ li ray
-          in  MV.write img (uvToIndex u v) spectrum
-        return img
-  in  \u v -> spectrumToPixel $ image V.! (uvToIndex u v)
-
-renderEval :: Int -> Int -> [(Int, Int)] ->
-              (Float -> Float -> Ray) -> (Ray -> Eval Spectrum) ->
-              ImageF
-renderEval w h samples cast li =
-  let uvToIndex u v = w * v + u
-      image = V.create $ do
-        img <- MV.new (w * h)
-        let evals :: [Eval Spectrum]
-            evals = [ li (cast (fromIntegral u) (fromIntegral v)) >>= rpar
-                    | (u, v) <- samples ]
-            uvSpectra :: [((Int, Int), Spectrum)]
-            uvSpectra = zip samples $ runEval $ sequence evals
-        forM_ uvSpectra $ \((u, v), spectrum) ->
+        forM_ samples $ \((u, v), spectrum) ->
           MV.write img (uvToIndex u v) spectrum
         return img
-  in  \u v -> spectrumToPixel $ image V.! (uvToIndex u v)
+      getPixel u v = spectrumToPixel $ image V.! (uvToIndex u v)
+  in  generateImage getPixel w h
 
-scannySamplePoints w h = [(u, v) | u <- [0..w-1], v <- [0..h-1]]
-
-patchySamplePoints w h =
-  (concat $ [shift x y $ scannySamplePoints patchW patchH
-            | x <- [0..patchCountX - 1], y <- [0..patchCountY - 1]])
-  ++
-  (concat $ [shift patchCountX y $ scannySamplePoints lastPatchW patchH
-            | y <- [0..patchCountY - 1]])
-  ++
-  (concat $ [shift x patchCountY $ scannySamplePoints patchW lastPatchH
-            | x <- [0..patchCountX - 1]])
-  ++
-  (shift patchCountX patchCountY $ scannySamplePoints lastPatchW lastPatchH)
-
-  where patchW = 20
-        patchH = 20
-        (patchCountX, lastPatchW) = w `quotRem` patchW
-        (patchCountY, lastPatchH) = h `quotRem` patchH
-        shift x y samples = [(u + x * patchW, v + y * patchH)
-                            | (u, v) <- samples]
+roundUpPow2 :: Int -> Int
+roundUpPow2 x = 2 ^ (ceiling (logBase 2 (fromIntegral x)))
 
 main = do
+  numThreads <- getNumCapabilities
   args <- getArgs
   if length args < 2
     then
@@ -121,15 +104,19 @@ main = do
 
           lights = [v | S.PointLight v <- S.lights scene]
 
-          li :: (Monad m) => Ray -> m Spectrum
+          li :: Ray -> Spectrum
           li = radiance (S.integrator scene) lights collider
 
-          samplePoints = scannySamplePoints width height
+          nBatches = roundUpPow2 $ max
+            (32 * numThreads)
+            width * height `div` (16 * 16)
+          samplePoints = squareBatches width height nBatches
 
-          sampleImg =
+          samples =
             if parallelOn
               then renderEval width height samplePoints caster li
               else render width height samplePoints caster li
-          img = generateImage sampleImg width height
+          img = samplesToImage width height samples
 
+      putStrLn $ (show numThreads) ++ " threads, " ++ (show nBatches) ++ " batches"
       savePngImage outputFileName (ImageRGBF img)

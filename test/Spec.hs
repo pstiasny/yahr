@@ -2,6 +2,7 @@
 import Control.Monad (forM_)
 import Data.Maybe (isJust, isNothing)
 import Data.List (sort)
+import qualified Data.Set as Set
 
 import Test.Hspec
 
@@ -15,6 +16,7 @@ import qualified Culling
 import qualified BSDF
 import qualified Shaders
 import qualified Integrators
+import qualified Sampling
 import DifferentialGeometry
 
 near :: Vec3 -> Vec3 -> Bool
@@ -318,3 +320,21 @@ main = hspec $ do
             lights = [vec angle | angle <- [0.25 * pi, 0.50 * pi, 0.75 * pi, 0.9*pi]]
             fs = [lensq $ BSDF.at bsdf dg light eye | light <- lights]
         fs `shouldBe` sort fs
+
+  describe "Sampling" $ do
+    describe "squareBatches" $ do
+      let dimensions = [(40, 40, 5), (40, 40, 16), (1, 1, 1), (20, 1, 3), (1, 20, 3)]
+
+      it "cover the whole image" $ forM_ dimensions $ \(w, h, n) -> do
+        let batches = Sampling.squareBatches w h n
+            s = Set.fromList (concat batches)
+        foldl (flip Set.delete) s [(u, v) | u <- [0..w-1], v <- [0..h-1]]
+          `shouldSatisfy` Set.null
+
+      it "do not overlap" $ forM_ dimensions $ \(w, h, n) -> do
+        let samples = concat $ Sampling.squareBatches w h n
+            hasOverlapping = snd $ foldl
+              (\(s, b) x -> (Set.insert x s, Set.member x s || b))
+              (Set.empty, False)
+              samples
+        hasOverlapping `shouldBe` False
