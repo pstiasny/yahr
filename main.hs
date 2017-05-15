@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 import Control.Concurrent (getNumCapabilities)
+import Control.DeepSeq (force)
 import Control.Monad (forM_)
 import Control.Parallel.Strategies (Eval, rpar, runEval)
 import Data.Functor.Identity (Identity, runIdentity)
@@ -63,7 +64,7 @@ renderEval w h batches cast li =
   let batch coords = [ ((u, v), li (cast (fromIntegral u) (fromIntegral v)))
                      | (u, v) <- coords ]
       evals :: [Eval [Sample]]
-      evals = [ rpar (batch coords) | coords <- batches ]
+      evals = [ rpar (force (batch coords)) | coords <- batches ]
   in  concat $ runEval $ sequence evals
 
 samplesToImage :: Int -> Int -> [Sample] -> Image PixelRGBF

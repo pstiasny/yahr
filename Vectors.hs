@@ -1,7 +1,12 @@
 module Vectors where
 
+import Control.DeepSeq (NFData, rnf)
+
 data Vec3 = Vec3 {-# UNPACK #-}!Float {-# UNPACK #-}!Float {-# UNPACK #-}!Float
             deriving (Read, Show)
+
+instance NFData Vec3 where
+  rnf (Vec3 x1 x2 x3) = rnf x1 `seq` rnf x2 `seq` rnf x3
 
 type Spectrum = Vec3
 type Light = Vec3
