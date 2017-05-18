@@ -119,5 +119,5 @@ main = do
               else render width height samplePoints caster li
           img = samplesToImage width height samples
 
-      putStrLn $ (show numThreads) ++ " threads, " ++ (show nBatches) ++ " batches"
+      putStrLn $ (show numThreads) ++ " threads, " ++ (show nBatches) ++ " batches, parallel " ++ (show parallelOn)
       savePngImage outputFileName (ImageRGBF img)
