@@ -25,8 +25,17 @@ class YahrRenderEngine(bpy.types.RenderEngine):
         image_path = path.join(bpy.app.tempdir, 'blender_scene.png')
         with open(scene_path, 'w') as f:
             f.write(self.make_scene(scene).repr())
+
+        if scene.yahr.parallelism_mode == 'EVAL':
+            parallelism_mode_switch = '--parallel-eval'
+        else:
+            parallelism_mode_switch = '--parallel-disabled'
+
+        threads = '-N{}'.format(scene.yahr.threads)
+
         call([path.join(path.dirname(path.abspath(__file__)), 'yahr'),
-              '--parallel-eval', scene_path, image_path, '+RTS', '-N2'])
+              parallelism_mode_switch, scene_path, image_path,
+              '+RTS', threads])
         layer.load_from_file(image_path)
 
         self.end_result(result)
