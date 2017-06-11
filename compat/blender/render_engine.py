@@ -1,3 +1,4 @@
+from collections import defaultdict
 from os import path
 from subprocess import call
 
@@ -10,6 +11,13 @@ class YahrRenderEngine(bpy.types.RenderEngine):
     bl_idname = 'yahr_renderer'
     bl_label = 'Yahr Renderer'
     bl_use_preview = False
+
+    default_material = BlinnPhongMaterial(
+        id='__default__',
+        ambient=Vec3(0, 0, 0),
+        diffuse=Vec3(1, 1, 1),
+        specular=Vec3(0.3, 0.3, 0.3),
+        shininess=1)
 
     _flip = Matrix.Scale(-1, 4, Vector((1, 0, 0)))
 
@@ -42,11 +50,11 @@ class YahrRenderEngine(bpy.types.RenderEngine):
 
     def make_scene(self, scene):
         camera = self.make_camera(scene, scene.camera)
-        objects = [
-            self.make_mesh(scene, o)
-            for o in scene.objects
-            if o.type == 'MESH'
-        ]
+        materials = {self.default_material.id: self.default_material}
+        objects = []
+        for o in scene.objects:
+            if o.type == 'MESH':
+                objects.extend(self.make_meshes(scene, materials, o))
         lights = [
             self.make_light(scene, o)
             for o in scene.objects
@@ -56,26 +64,27 @@ class YahrRenderEngine(bpy.types.RenderEngine):
             WhittedIntegrator(2),
             BVH(16),
             camera,
-            [
-                BlinnPhongMaterial(
-                    id="mat",
-                    ambient=Vec3(0.9, 0.9, 0.9),
-                    diffuse=Vec3(1, 1, 1),
-                    specular=Vec3(0.3, 0.3, 0.3),
-                    shininess=1),
-            ],
+            materials.values(),
             lights,
             objects)
 
-    def make_mesh(self, scene, object):
+    def make_meshes(self, scene, materials, object):
         m = object.to_mesh(scene, True, 'RENDER')
+
+        # NOTE: To support blender's per-face materials, the mesh has to
+        # be split into separate objects for each material.  Currently,
+        # the whole triangle list is copied for each object.  This should
+        # be optimized.
         vertices = [
             self.blender_to_yahr_vec(self._flip * object.matrix_world * v.co)
             for v in m.vertices
         ]
-        triangles = []
-        flip = True
+        triangles_by_material_index = (
+            [[] for _ in m.materials] if m.materials else
+            [[]]
+        )
         for face in m.tessfaces:
+            triangles = triangles_by_material_index[face.material_index]
             if len(face.vertices) == 3:
                 triangles.append((
                     face.vertices[0], face.vertices[1],face.vertices[2]
@@ -89,7 +98,33 @@ class YahrRenderEngine(bpy.types.RenderEngine):
                 ))
             else:
                 raise Exception('only triangles and quads are supported')
-        return TriangleMesh(vertices, triangles, "mat")
+
+        if m.materials:
+            meshes = []
+            for bl_material, triangles in zip(m.materials, triangles_by_material_index):
+                try:
+                    material = materials[bl_material.name]
+                except KeyError:
+                    material = self.make_material(scene, bl_material)
+                    materials[bl_material.name] = material
+                mesh = TriangleMesh(vertices, triangles, material.id)
+                meshes.append(mesh)
+            return meshes
+        else:
+            return [
+                TriangleMesh(vertices, triangles_by_material_index[0],
+                             self.default_material.id)
+            ]
+
+    def make_material(self, scene, material):
+        return BlinnPhongMaterial(
+            id=material.name,
+            ambient=Vec3(0.0, 0.0, 0.0),
+            diffuse=self.blender_to_yahr_vec(
+                material.diffuse_intensity * material.diffuse_color),
+            specular=self.blender_to_yahr_vec(
+                material.specular_intensity * material.specular_color),
+            shininess=material.specular_hardness)
 
     def make_camera(self, scene, camera):
         up = self._flip * camera.matrix_world * Vector((0.0, 1.0, 0.0, 0.0))

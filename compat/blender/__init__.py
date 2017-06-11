@@ -17,9 +17,6 @@ def register():
     Engine = render_engine.YahrRenderEngine
     bpy.utils.register_class(Engine)
 
-    from bl_ui import properties_render
-    properties_render.RENDER_PT_render.COMPAT_ENGINES.add(Engine.bl_idname)
-    properties_render.RENDER_PT_dimensions.COMPAT_ENGINES.add(Engine.bl_idname)
     properties.register()
     ui.register()
 
@@ -28,8 +25,5 @@ def unregister():
     Engine = render_engine.YahrRenderEngine
     bpy.utils.unregister_class(Engine)
 
-    from bl_ui import properties_render
-    properties_render.RENDER_PT_render.COMPAT_ENGINES.remove(Engine.bl_idname)
-    properties_render.RENDER_PT_dimensions.COMPAT_ENGINES.remove(Engine.bl_idname)
     properties.unregister()
     ui.unregister()

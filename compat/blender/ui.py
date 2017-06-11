@@ -13,6 +13,21 @@ def draw_device(self, context):
 def register():
     bpy.types.RENDER_PT_render.append(draw_device)
 
+    from .render_engine import YahrRenderEngine as Engine
+    from bl_ui import properties_render, properties_material
+    properties_render.RENDER_PT_render.COMPAT_ENGINES.add(Engine.bl_idname)
+    properties_render.RENDER_PT_dimensions.COMPAT_ENGINES.add(Engine.bl_idname)
+    properties_material.MATERIAL_PT_context_material.COMPAT_ENGINES.add(Engine.bl_idname)
+    properties_material.MATERIAL_PT_diffuse.COMPAT_ENGINES.add(Engine.bl_idname)
+    properties_material.MATERIAL_PT_specular.COMPAT_ENGINES.add(Engine.bl_idname)
 
 def unregister():
     bpy.types.RENDER_PT_render.remove(draw_device)
+
+    from .render_engine import YahrRenderEngine as Engine
+    from bl_ui import properties_render, properties_material
+    properties_render.RENDER_PT_render.COMPAT_ENGINES.remove(Engine.bl_idname)
+    properties_render.RENDER_PT_dimensions.COMPAT_ENGINES.remove(Engine.bl_idname)
+    properties_material.MATERIAL_PT_context_material.COMPAT_ENGINES.remove(Engine.bl_idname)
+    properties_material.MATERIAL_PT_diffuse.COMPAT_ENGINES.remove(Engine.bl_idname)
+    properties_material.MATERIAL_PT_specular.COMPAT_ENGINES.remove(Engine.bl_idname)

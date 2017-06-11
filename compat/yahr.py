@@ -70,7 +70,7 @@ class BlinnPhongMaterial(object):
             'BlinnPhongMaterial { id = "%s", ambient = %s, diffuse = %s, '
             'specular = %s, shininess = %f }'
         ) % (
-            self.id, self.ambient.repr(), self.diffuse.repr(),
+            repr_string(self.id), self.ambient.repr(), self.diffuse.repr(),
             self.specular.repr(), self.shininess,
         )
 
@@ -98,7 +98,7 @@ class TriangleMesh(object):
             ','.join(
                 '(%d, %d, %d)' % (i1, i2, i3)
                 for i1, i2, i3 in self.triangleMeshTriangles),
-            self.materialId
+            repr_string(self.materialId)
         )
 
 
@@ -110,3 +110,7 @@ class Vec3(object):
 
     def repr(self):
         return '(Vec3 %f %f %f)' % (self.x1, self.x2, self.x3)
+
+
+def repr_string(s):
+    return s.replace('\\', '\\\\').replace('"', '\\"')
