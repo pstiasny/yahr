@@ -79,40 +79,60 @@ class YahrRenderEngine(bpy.types.RenderEngine):
             self.blender_to_yahr_vec(self._flip * object.matrix_world * v.co)
             for v in m.vertices
         ]
+        normals = [
+            self.blender_to_yahr_vec(
+                self._flip * object.matrix_world *
+                Vector((v.normal.x, v.normal.y, v.normal.z, 0)))
+            for v in m.vertices
+        ]
         triangles_by_material_index = (
+            [[] for _ in m.materials] if m.materials else
+            [[]]
+        )
+        smooth_by_material_index = (
             [[] for _ in m.materials] if m.materials else
             [[]]
         )
         for face in m.tessfaces:
             triangles = triangles_by_material_index[face.material_index]
+            smooth = smooth_by_material_index[face.material_index]
             if len(face.vertices) == 3:
                 triangles.append((
-                    face.vertices[0], face.vertices[1],face.vertices[2]
+                    face.vertices[0], face.vertices[1], face.vertices[2]
                 ))
+                smooth.append(face.use_smooth)
             elif len(face.vertices) == 4:
                 triangles.append((
-                    face.vertices[0], face.vertices[1],face.vertices[2]
+                    face.vertices[0], face.vertices[1], face.vertices[2]
                 ))
                 triangles.append((
-                    face.vertices[0], face.vertices[2],face.vertices[3]
+                    face.vertices[0], face.vertices[2], face.vertices[3]
                 ))
+                smooth.append(face.use_smooth)
+                smooth.append(face.use_smooth)
             else:
                 raise Exception('only triangles and quads are supported')
 
         if m.materials:
             meshes = []
-            for bl_material, triangles in zip(m.materials, triangles_by_material_index):
+            for bl_material, triangles, smooth in zip(
+                    m.materials,
+                    triangles_by_material_index,
+                    smooth_by_material_index):
                 try:
                     material = materials[bl_material.name]
                 except KeyError:
                     material = self.make_material(scene, bl_material)
                     materials[bl_material.name] = material
-                mesh = TriangleMesh(vertices, triangles, material.id)
+                mesh = TriangleMesh(
+                    vertices, normals, triangles, smooth, material.id)
                 meshes.append(mesh)
             return meshes
         else:
             return [
-                TriangleMesh(vertices, triangles_by_material_index[0],
+                TriangleMesh(vertices, normals,
+                             triangles_by_material_index[0],
+                             smooth_by_material_index[0],
                              self.default_material.id)
             ]
 

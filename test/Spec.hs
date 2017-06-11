@@ -114,7 +114,8 @@ main = hspec $ do
         bMax `shouldSatisfy` near (Vec3 15 15 20)
 
     describe "Triangle" $ do
-      let tc = Shapes.collideTriangle (1::Int) (Vec3 0 0 5) (Vec3 2 0 5) (Vec3 1 2 5)
+      let n = Vec3 0 0 (-1)
+          tc = Shapes.collideTriangle (1::Int) (Vec3 0 0 5) (Vec3 2 0 5) (Vec3 1 2 5) n n n
           tbb = Shapes.boundTriangle (Vec3 0 0 5) (Vec3 2 0 5) (Vec3 1 2 5)
 
       it "reflects rays intersecting with it" $ do
@@ -151,9 +152,11 @@ main = hspec $ do
                      Vec3 0 0 0, Vec3 0 0 1,
                      Vec3 0 1 0, Vec3 0 1 1
                      ],
+                   Scene.triangleMeshNormals = Nothing,
                    Scene.triangleMeshTriangles = [
                      (0, 1, 2), (1, 2, 3)
                      ],
+                   Scene.triangleMeshSmooth = Nothing,
                    Scene.materialId = "fooMaterial"
                    }
             [expandedT1, expandedT2] = Scene.expand tm
@@ -259,11 +262,12 @@ main = hspec $ do
 
 
   describe "Integrator" $ do
-    let bsdfTriangle bsdf = Shapes.collideTriangle mat p0 p1 p2
+    let bsdfTriangle bsdf = Shapes.collideTriangle mat p0 p1 p2 n n n
           where mat = Shaders.Material (\_ _ -> bsdf)
                 p0 = Vec3 (-10) (-10) 0
                 p1 = Vec3 10 (-10) 0
                 p2 = Vec3 0 10 0
+                n = Vec3 0 0 1
         integrator = Integrators.WhittedIntegrator { Integrators.recursionDepth = 1 }
         vec angle = Vec3 (cos angle) 0 (sin angle)
         pt angle = negate $ vec angle

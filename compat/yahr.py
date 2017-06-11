@@ -84,22 +84,48 @@ class PointLight(object):
 
 
 class TriangleMesh(object):
-    def __init__(self, triangleMeshPoints, triangleMeshTriangles, materialId):
+    def __init__(
+            self, triangleMeshPoints, triangleMeshNormals,
+            triangleMeshTriangles, triangleMeshSmooth, materialId):
         self.triangleMeshPoints = triangleMeshPoints
+        self.triangleMeshNormals = triangleMeshNormals
         self.triangleMeshTriangles = triangleMeshTriangles
+        self.triangleMeshSmooth = triangleMeshSmooth
         self.materialId = materialId
 
     def repr(self):
         return (
-            'TriangleMesh {triangleMeshPoints = [ %s ], '
-            'triangleMeshTriangles = [ %s ], materialId = "%s" }'
+            'TriangleMesh {'
+            'triangleMeshPoints = [ %s ], '
+            'triangleMeshNormals = %s, '
+            'triangleMeshTriangles = [ %s ], '
+            'triangleMeshSmooth = %s, '
+            'materialId = "%s" }'
         ) % (
             ','.join(p.repr() for p in self.triangleMeshPoints),
+            self.repr_normals(),
             ','.join(
                 '(%d, %d, %d)' % (i1, i2, i3)
                 for i1, i2, i3 in self.triangleMeshTriangles),
+            self.repr_smooth(),
             repr_string(self.materialId)
         )
+
+    def repr_normals(self):
+        if self.triangleMeshNormals is None:
+            return 'Nothing'
+        else:
+            return 'Just [%s]' % (
+                ','.join(n.repr() for n in self.triangleMeshNormals)
+            )
+
+    def repr_smooth(self):
+        if self.triangleMeshSmooth is None:
+            return 'Nothing'
+        else:
+            return 'Just [%s]' % (
+                ','.join(repr_bool(s) for s in self.triangleMeshSmooth)
+            )
 
 
 class Vec3(object):
@@ -114,3 +140,7 @@ class Vec3(object):
 
 def repr_string(s):
     return s.replace('\\', '\\\\').replace('"', '\\"')
+
+
+def repr_bool(b):
+    return 'True' if b else 'False'

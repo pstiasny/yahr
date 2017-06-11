@@ -31,11 +31,12 @@ buildCollisionModel s = zip sceneObjBounds sceneColliders
 
     sceneColliders = map collideSceneObject sceneObjects
     collideSceneObject (S.Sphere p r mId) = collideSphere (mat mId) r p
-    collideSceneObject (S.Triangle p0 p1 p2 mId) = collideTriangle (mat mId) p0 p1 p2
+    collideSceneObject (S.Triangle p0 p1 p2 n0 n1 n2 mId) =
+      collideTriangle (mat mId) p0 p1 p2 n0 n1 n2
 
     sceneObjBounds = map boundSceneObject sceneObjects
     boundSceneObject (S.Sphere p r mId) = boundSphere r p
-    boundSceneObject (S.Triangle p0 p1 p2 mId) = boundTriangle p0 p1 p2
+    boundSceneObject (S.Triangle {S.p0, S.p1, S.p2, S.materialId=mId}) = boundTriangle p0 p1 p2
 
     mat mId = Material (mats ! mId)
     mats :: Map String Shader

@@ -7,10 +7,12 @@ if "bpy" in locals():
         importlib.reload(ui)
     if "properties" in locals():
         importlib.reload(properties)
+    if "yahr" in locals():
+        importlib.reload(yahr)
 
 import bpy
 
-from . import properties, render_engine, ui
+from . import properties, render_engine, ui, yahr
 
 
 def register():

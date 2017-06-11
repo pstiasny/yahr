@@ -33,8 +33,8 @@ boundSphere :: Float -> Vec3 -> BB.BoundingBox
 boundSphere r s = BB.fromPoints (s + vof r) (s - vof r)
 
 
-collideTriangle :: a -> Vec3 -> Vec3 -> Vec3 -> Collider a
-collideTriangle what p0 p1 p2 (Ray {x0, u, tMax}) =
+collideTriangle :: a -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> Collider a
+collideTriangle what p0 p1 p2 n0 n1 n2 (Ray {x0, u, tMax}) =
   let e1 = p1 - p0
       e2 = p2 - p0
       s = x0 - p0
@@ -45,13 +45,16 @@ collideTriangle what p0 p1 p2 (Ray {x0, u, tMax}) =
       b1 = s1 .* s * invDiv
       b2 = s2 .* u * invDiv
       b0 = 1 - b1 - b2
+      ns = b0 @* n0 + b1 @* n1 + b2 @* n2
+      ss = norm e2
+      ts = norm $ ss `cross` ns
       dg = DifferentialGeometry {
              dgPoint = x0 + t @* u,
-             dgNormal = norm $ e2 `cross` e1,
-             dgDPDU = norm $ e2,
-             dgDPDV = norm $ e1 }
+             dgNormal = ns,
+             dgDPDU = ts `cross` ns,
+             dgDPDV = ts }
   in  if   b0 >= 0 && b0 <= 1 && b1 >= 0 && b1 <= 1 && b2 >= 0 && b2 <= 1 &&
-             t > 0 && t <= tMax
+             t > 0 && t <= tMax && (u .* ns) < 0
       then Just (Hit t dg what)
       else Nothing
 

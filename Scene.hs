@@ -2,6 +2,7 @@
 
 module Scene where
 
+import Data.Maybe (fromMaybe)
 import qualified Data.Vector as A
 
 import Vectors
@@ -20,11 +21,16 @@ data SceneObject =
        p0 :: Vec3,
        p1 :: Vec3,
        p2 :: Vec3,
+       n0 :: Vec3,
+       n1 :: Vec3,
+       n2 :: Vec3,
        materialId :: String
      }
    | TriangleMesh {
        triangleMeshPoints :: [Vec3],
+       triangleMeshNormals :: Maybe [Vec3],
        triangleMeshTriangles :: [(Int, Int, Int)],
+       triangleMeshSmooth :: Maybe [Bool],
        materialId :: String
      }
    | Subsampled {
@@ -54,11 +60,24 @@ data Scene = Scene { integrator :: I.IntegratorSpec,
 
 
 expand :: SceneObject -> [SceneObject]
-expand (TriangleMesh {triangleMeshPoints, triangleMeshTriangles, materialId}) =
+expand (TriangleMesh {triangleMeshPoints, triangleMeshTriangles,
+                      triangleMeshNormals, triangleMeshSmooth, materialId}) =
   let points = A.fromList triangleMeshPoints
-      triangleOfPoints (i0, i1, i2) = Triangle (points A.! i0) (points A.! i1)
-                                               (points A.! i2) materialId
-  in  map triangleOfPoints triangleMeshTriangles
+      mNormals = fmap A.fromList triangleMeshNormals
+      smooth = fromMaybe (repeat False) triangleMeshSmooth
+      triangleOfPoints (i0, i1, i2) smooth = case mNormals of
+        Just normals -> Triangle p0 p1 p2 n0 n1 n2 materialId
+          where (n0, n1, n2) =
+                  if smooth
+                    then (normals A.! i0, normals A.! i1, normals A.! i2)
+                    else (n, n, n)
+        Nothing -> Triangle p0 p1 p2 n n n materialId
+        where 
+          p0 = (points A.! i0)
+          p1 = (points A.! i1)
+          p2 = (points A.! i2)
+          n = norm $ (p2 - p0) `cross` (p1 - p0)
+  in  zipWith triangleOfPoints triangleMeshTriangles smooth
 expand (Subsampled { subsampledObjects, subsampleSize }) =
   let ofHundred = ceiling (subsampleSize * 100)
       pick [] = []
