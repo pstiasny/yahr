@@ -104,10 +104,8 @@ main = do
           width = floor $ imW camera
           height = floor $ imH camera
 
-          lights = [v | S.PointLight v <- S.lights scene]
-
           li :: Ray -> Spectrum
-          li = radiance (S.integrator scene) lights collider
+          li = radiance (S.integrator scene) (S.lights scene) collider
 
           nBatches = roundUpPow2 $ max
             (32 * numThreads)

@@ -76,11 +76,15 @@ class BlinnPhongMaterial(object):
 
 
 class PointLight(object):
-    def __init__(self, position):
+    def __init__(self, position, spectrum):
         self.position = position
+        self.spectrum = spectrum
 
     def repr(self):
-        return '(PointLight %s)' % self.position.repr()
+        return '(PointLight %s %s)' % (
+            self.position.repr(),
+            self.spectrum.repr(),
+        )
 
 
 class TriangleMesh(object):

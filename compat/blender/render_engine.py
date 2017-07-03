@@ -160,8 +160,11 @@ class YahrRenderEngine(bpy.types.RenderEngine):
 
     def make_light(self, scene, object):
         lamp = object.data
+        if lamp.type != 'POINT':
+            print('warning: unsupported light type:', lamp.type)
         pos = self.blender_to_yahr_vec(self._flip * object.location)
-        return PointLight(pos)
+        spectrum = self.blender_to_yahr_vec(lamp.energy * lamp.color)
+        return PointLight(pos, spectrum)
     
     def blender_to_yahr_vec(self, v):
         return Vec3(v[0], v[1], v[2])

@@ -26,7 +26,7 @@ def test_parse():
                 shininess=1),
         ],
         [
-            PointLight(Vec3(4, 10, 10))
+            PointLight(Vec3(4, 10, 10), Vec3(1, 1, 1)),
         ],
         [
             TriangleMesh(

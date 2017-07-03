@@ -17,6 +17,7 @@ import qualified BSDF
 import qualified Shaders
 import qualified Integrators
 import qualified Sampling
+import qualified Lights
 import DifferentialGeometry
 
 near :: Vec3 -> Vec3 -> Bool
@@ -272,24 +273,25 @@ main = hspec $ do
         vec angle = Vec3 (cos angle) 0 (sin angle)
         pt angle = negate $ vec angle
         eye angle = Ray { x0 = pt angle, u = vec angle, tMax = 1e6 }
+        pointLight pos = Lights.PointLight pos (Vec3 1 1 1)
 
         bsdf = BSDF.Blinn 10
         collider = bsdfTriangle bsdf
 
     it "should not reflect on the rear side" $ do
       let ray = Ray { x0 = Vec3 0 0 (-1), u = Vec3 0 0 1, tMax = 1e6 }
-          light = Vec3 (cos (pi/4)) 0 (sin (pi/4))
+          light = pointLight (Vec3 (cos (pi/4)) 0 (sin (pi/4)))
           rad = Integrators.radiance integrator [light] collider ray
       rad `shouldSatisfy` near (vof 0)
 
       let ray = eye (1.5*pi)
-          light = pt (0.25*pi)
+          light = pointLight (pt (0.25*pi))
           rad = Integrators.radiance integrator [light] collider ray
       rad `shouldSatisfy` near (vof 0)
 
     it "should reflect the most when incident angle equals reflected angle" $ do
       let ray = eye (0.25*pi)
-          lights = [pt angle | angle <- [0.25*pi, 0.50*pi, 0.75*pi]]
+          lights = [pointLight (pt angle) | angle <- [0.25*pi, 0.50*pi, 0.75*pi]]
           rads = [lensq $ Integrators.radiance integrator [light] collider ray
                  | light <- lights]
       rads `shouldBe` sort rads

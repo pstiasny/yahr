@@ -2,13 +2,18 @@
 
 module Integrators where
 
-import Data.Maybe (isNothing)
-
 import Vectors
-import DifferentialGeometry
-import Rays
-import Shaders
-import BSDF
+import DifferentialGeometry (DifferentialGeometry (DifferentialGeometry, dgPoint, dgNormal))
+import Rays (Collider, Hit (Hit), Ray (Ray, x0, u, tMax))
+import Shaders (Material (Material))
+import Lights
+    ( Light
+    , illuminationAtPoint
+    , lightSampleDir
+    , lightSampleIntensity
+    , lightSampleUnoccluded
+    )
+import qualified BSDF
 
 data IntegratorSpec =
   WhittedIntegrator { recursionDepth :: Int }
@@ -42,22 +47,15 @@ reflectionDir :: Vec3 -> Vec3 -> Vec3
 reflectionDir u n = u - 2 * (u .* n) @* n
 
 
-reachable :: Collider a -> Vec3 -> Vec3 -> Bool
-reachable rc p0 p1 = isNothing (rc probe)
-  where probe = Ray { x0 = p0
-                    , u = norm $ p1 - p0
-                    , tMax = len (p1 - p0)
-                    }
-
-
 directIllumination :: Collider a -> DifferentialGeometry -> Ray -> [Light] -> BSDF.BSDF -> Spectrum
 directIllumination rc dg ray lights bsdf = sum (map lightContribution lights)
   where
     x = dgPoint dg
     n = dgNormal dg
-    lightContribution lightPos =
-      let lightDir = norm $ lightPos - x
+    lightContribution light =
+      let ls = illuminationAtPoint light rc x
+          lightDir = lightSampleDir ls
           k = BSDF.at bsdf dg lightDir (negate (u ray))
-      in  if lensq k > 0 && reachable rc (x + 0.001 @* lightDir) lightPos
-            then abs (lightDir .* n) @* k
+      in  if lensq k > 0 && lightSampleUnoccluded ls
+            then abs (lightDir .* n) @* k * (lightSampleIntensity ls)
             else vof 0

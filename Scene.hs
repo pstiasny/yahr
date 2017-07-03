@@ -9,6 +9,7 @@ import Vectors
 import qualified Cameras as C
 import qualified Culling
 import qualified Integrators as I
+import qualified Lights as L
 
 
 data SceneObject =
@@ -48,13 +49,11 @@ data Material = BlinnPhongMaterial { id :: String,
                                      shininess :: Float
                                    } deriving (Read, Show)
 
-data SceneLight = PointLight Vec3 deriving (Read, Show)
-
 data Scene = Scene { integrator :: I.IntegratorSpec,
                      cullingMode :: Culling.CullingMode,
                      camera :: C.Camera,
                      materials :: [ Material ],
-                     lights :: [ SceneLight ],
+                     lights :: [ L.Light ],
                      objects :: [ SceneObject ]
                    } deriving (Read, Show)
 

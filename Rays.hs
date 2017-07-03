@@ -2,7 +2,7 @@
 module Rays where
 
 import Data.List (sortOn)
-import Data.Maybe (catMaybes, listToMaybe)
+import Data.Maybe (catMaybes, listToMaybe, isNothing)
 
 import Vectors
 import DifferentialGeometry
@@ -44,3 +44,11 @@ collideAll colliders ray =
       case collider ray of
         Just h -> (Just h, cutRay (tHit h) ray)
         Nothing -> (mhit, ray)
+
+
+reachable :: Collider a -> Vec3 -> Vec3 -> Bool
+reachable rc p0 p1 = isNothing (rc probe)
+  where probe = Ray { x0 = p0
+                    , u = norm $ p1 - p0
+                    , tMax = len (p1 - p0)
+                    }
