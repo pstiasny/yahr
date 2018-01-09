@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+import System.Console.ArgParser (parsedBy, andBy, reqPos, optFlag, withParseResult)
 import Control.Concurrent (getNumCapabilities)
 import Control.DeepSeq (force)
 import Control.Monad (forM_)
@@ -22,6 +23,19 @@ import Culling
 import AABBs (BoundingBox)
 import Integrators (radiance)
 import Sampling (lineBatches, squareBatches)
+
+
+data Invocation = Invocation
+  { invInput :: String
+  , invOutput :: String
+  , invParMode :: String
+  }
+
+
+invocationParser = Invocation
+  `parsedBy` reqPos "input"
+  `andBy` reqPos "output"
+  `andBy` optFlag "sequential" "parallel-mode"
 
 
 buildCollisionModel :: S.Scene -> [(BoundingBox, Collider Material)]
@@ -68,6 +82,10 @@ renderEval w h batches cast li =
       evals = [ rpar (force (batch coords)) | coords <- batches ]
   in  concat $ runEval $ sequence evals
 
+
+renderPar :: [Sample]
+renderPar = []
+
 samplesToImage :: Int -> Int -> [Sample] -> Image PixelRGBF
 samplesToImage w h samples =
   let uvToIndex u v = w * v + u
@@ -82,41 +100,37 @@ samplesToImage w h samples =
 roundUpPow2 :: Int -> Int
 roundUpPow2 x = 2 ^ (ceiling (logBase 2 (fromIntegral x)))
 
-main = do
+app invocation = do
   numThreads <- getNumCapabilities
-  args <- getArgs
-  if length args < 2
-    then
-      putStrLn "usage: yahr <input file> <output file>"
-    else do
-      let fileNames (i:o:[]) = (i, o)
-          fileNames (_:t) = fileNames t
-          (sceneFileName, outputFileName) = fileNames args
-          parallelOn = "--parallel-eval" `elem` args
 
-      sceneFile <- readFile sceneFileName
+  sceneFile <- readFile (invInput invocation)
 
-      let scene = read sceneFile :: S.Scene
-          collider = cull (S.cullingMode scene) (buildCollisionModel scene)
+  let scene = read sceneFile :: S.Scene
+      collider = cull (S.cullingMode scene) (buildCollisionModel scene)
 
-          camera = S.camera scene
-          caster = computeInitialRay camera
-          width = floor $ imW camera
-          height = floor $ imH camera
+      camera = S.camera scene
+      caster = computeInitialRay camera
+      width = floor $ imW camera
+      height = floor $ imH camera
 
-          li :: Ray -> Spectrum
-          li = radiance (S.integrator scene) (S.lights scene) collider
+      li :: Ray -> Spectrum
+      li = radiance (S.integrator scene) (S.lights scene) collider
 
-          nBatches = roundUpPow2 $ max
-            (32 * numThreads)
-            width * height `div` (16 * 16)
-          samplePoints = squareBatches width height nBatches
+      nBatches = roundUpPow2 $ max
+        (32 * numThreads)
+        width * height `div` (16 * 16)
+      samplePoints = squareBatches width height nBatches
 
-          samples =
-            if parallelOn
-              then renderEval width height samplePoints caster li
-              else render width height samplePoints caster li
-          img = samplesToImage width height samples
+      samples =
+        case (invParMode invocation) of
+          "sequential" -> render width height samplePoints caster li
+          "eval" -> renderEval width height samplePoints caster li
+          "par" -> renderPar
+      img = samplesToImage width height samples
 
-      putStrLn $ (show numThreads) ++ " threads, " ++ (show nBatches) ++ " batches, parallel " ++ (show parallelOn)
-      savePngImage outputFileName (ImageRGBF img)
+  putStrLn $ (show numThreads) ++ " threads, " ++ (show nBatches) ++
+             " batches, parallel " ++ (invParMode invocation)
+  savePngImage (invOutput invocation) (ImageRGBF img)
+
+
+main = withParseResult invocationParser app

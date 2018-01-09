@@ -1,4 +1,5 @@
-from os import getenv
+from os import getenv, unlink, stat
+from os.path import exists
 from subprocess import call
 
 from yahr import *
@@ -53,4 +54,13 @@ def test_parse():
     repr_ = scene.repr()
     with open('.testscene.yahr', 'w') as f:
         f.write(repr_)
-    assert call(yahr_cmd + ' .testscene.yahr .testout.png', shell=True) == 0
+
+    outpath = '.testout.png'
+    if exists(outpath):
+        unlink(outpath)
+
+    assert call(yahr_cmd + ' .testscene.yahr ' + outpath, shell=True) == 0
+
+    # check if output exists and is nonempty
+    out_stat = stat(outpath)
+    assert out_stat.st_size > 0

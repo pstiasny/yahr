@@ -42,7 +42,8 @@ class YahrRenderEngine(bpy.types.RenderEngine):
         threads = '-N{}'.format(scene.yahr.threads)
 
         call([path.join(path.dirname(path.abspath(__file__)), 'yahr'),
-              parallelism_mode_switch, scene_path, image_path,
+              scene_path, image_path,
+              '-p', scene.yahr.parallelism_mode.lower(),
               '+RTS', threads])
         layer.load_from_file(image_path)
 

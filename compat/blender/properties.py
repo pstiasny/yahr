@@ -7,8 +7,9 @@ from bpy.props import (
 
 
 enum_parallelism_mode = (
-    ('DISABLED', 'Disabled', 'No parallelism'),
+    ('SEQUENTIAL', 'Disabled', 'No parallelism'),
     ('EVAL', 'Eval', 'Use the Eval monad for parallel execution'),
+    ('PAR', 'Par', 'Use the Par monad for parallel execution'),
 )
 
 
