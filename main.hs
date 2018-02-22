@@ -5,7 +5,7 @@ import Control.Concurrent (getNumCapabilities)
 import Control.DeepSeq (force)
 import Control.Monad (forM_)
 import Control.Parallel.Strategies (Eval, rpar, runEval)
-import Data.Functor.Identity (Identity, runIdentity)
+import Control.Monad.Par (runPar, spawn, get)
 import Data.Map (Map, fromList, (!))
 import Data.Tuple (swap)
 import qualified Data.Vector as V
@@ -83,8 +83,17 @@ renderEval w h batches cast li =
   in  concat $ runEval $ sequence evals
 
 
-renderPar :: [Sample]
-renderPar = []
+renderPar :: Int -> Int -> [[SampleCoordinates]] ->
+             (Float -> Float -> Ray) -> (Ray -> Spectrum) ->
+             [Sample]
+renderPar w h batches cast li =
+  let batch coords = [ ((u, v), li (cast (fromIntegral u) (fromIntegral v)))
+                     | (u, v) <- coords ]
+      par = do
+        ivars <- mapM (spawn . return . batch) batches
+        pixelBatches <- mapM get ivars
+        return $ concat pixelBatches
+  in  runPar par
 
 samplesToImage :: Int -> Int -> [Sample] -> Image PixelRGBF
 samplesToImage w h samples =
@@ -125,7 +134,7 @@ app invocation = do
         case (invParMode invocation) of
           "sequential" -> render width height samplePoints caster li
           "eval" -> renderEval width height samplePoints caster li
-          "par" -> renderPar
+          "par" -> renderPar width height samplePoints caster li
       img = samplesToImage width height samples
 
   putStrLn $ (show numThreads) ++ " threads, " ++ (show nBatches) ++
