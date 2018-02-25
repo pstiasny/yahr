@@ -1,5 +1,7 @@
 module BSDF (BSDF (Blinn, Lambertian), at, sample, add, scale, (&*), (&+)) where
 
+import Linear.V3 (V3 (V3))
+
 import Vectors
 import DifferentialGeometry
 
@@ -33,17 +35,17 @@ at bsdf dg i o = locAt bsdf (worldToLoc i) (worldToLoc o)
 
     fresnel ct = 1 -- TODO
 
-    nn@(Vec3 nnx nny nnz) = dgNormal dg
-    sn@(Vec3 snx sny snz) = norm $ dgDPDU dg
-    tn@(Vec3 tnx tny tnz) = nn `cross` sn
+    nn@(V3 nnx nny nnz) = dgNormal dg
+    sn@(V3 snx sny snz) = norm $ dgDPDU dg
+    tn@(V3 tnx tny tnz) = nn `cross` sn
 
-    worldToLoc v = Vec3 (v .* sn) (v .* tn) (v .* nn)
-    locToWorld (Vec3 vx vy vz) = Vec3 (snx * vx + tnx * vy + nnx * vz)
-                                      (sny * vx + tny * vy + nny * vz)
-                                      (snz * vx + tnz * vy + nnz * vz)
+    worldToLoc v = V3 (v .* sn) (v .* tn) (v .* nn)
+    locToWorld (V3 vx vy vz) = V3 (snx * vx + tnx * vy + nnx * vz)
+                                  (sny * vx + tny * vy + nny * vz)
+                                  (snz * vx + tnz * vy + nnz * vz)
 
-    cosTheta (Vec3 _ _ z) = z
-    absCosTheta (Vec3 _ _ z) = abs z
+    cosTheta (V3 _ _ z) = z
+    absCosTheta (V3 _ _ z) = abs z
 
 sample :: BSDF -> Vec3 -> Vec3 -> [Vec3]
 sample _ _ _ = []

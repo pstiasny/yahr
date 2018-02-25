@@ -13,6 +13,7 @@ module Cameras (
 
 import qualified Linear as L
 import Linear ((!*), (!*!))
+import Linear.V3 (V3 (V3))
 
 import Vectors
 import Rays
@@ -22,7 +23,7 @@ type TransfMx = L.M44 Float
 
 
 fromBasis :: Vec3 -> Vec3 -> Vec3 -> TransfMx
-fromBasis (Vec3 ax ay az) (Vec3 bx by bz) (Vec3 cx cy cz) =
+fromBasis (V3 ax ay az) (V3 bx by bz) (V3 cx cy cz) =
   L.V4 (L.V4 ax bx cx 0)
        (L.V4 ay by cy 0)
        (L.V4 az bz cz 0)
@@ -30,7 +31,7 @@ fromBasis (Vec3 ax ay az) (Vec3 bx by bz) (Vec3 cx cy cz) =
 
 
 translate :: Vec3 -> TransfMx
-translate (Vec3 tx ty tz) =
+translate (V3 tx ty tz) =
   L.V4 (L.V4 1 0 0 tx)
        (L.V4 0 1 0 ty)
        (L.V4 0 0 1 tz)
@@ -38,17 +39,16 @@ translate (Vec3 tx ty tz) =
 
 
 transformPoint :: TransfMx -> Vec3 -> Vec3
-transformPoint tf (Vec3 x y z) =
+transformPoint tf (V3 x y z) =
   let tv = tf !* L.V4 x y z 1
-      L.V3 tx ty tz = L.normalizePoint tv
-  in  Vec3 tx ty tz
+  in  L.normalizePoint tv
 
 
 transformVector :: TransfMx -> Vec3 -> Vec3
-transformVector tf (Vec3 x y z) =
+transformVector tf (V3 x y z) =
   let tv = tf !* L.V4 x y z 0
       L.V4 tx ty tz _ = tv
-  in  Vec3 tx ty tz
+  in  V3 tx ty tz
 
 
 data Camera = Camera { imW :: Float, imH :: Float, focalLength :: Float,
@@ -81,6 +81,6 @@ computeInitialRay (Camera {imW, imH, focalLength, lookDir, upDir, position}) =
       vtf = tf !*! rasterToCamera imW imH
 
   in  \u v ->
-    let origin = transformPoint tf (Vec3 0 0 0)
-        direction = transformPoint vtf (Vec3 u v focalLength) - origin
+    let origin = transformPoint tf (V3 0 0 0)
+        direction = transformPoint vtf (V3 u v focalLength) - origin
     in  Ray { x0 = origin, u = norm $ direction, tMax = 1e6 }

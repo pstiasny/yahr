@@ -2,10 +2,12 @@
 
 module Integrators where
 
+import Linear.V3 (V3 (V3))
+
 import Vectors
 import DifferentialGeometry (DifferentialGeometry (DifferentialGeometry, dgPoint, dgNormal))
 import Rays (Collider, Hit (Hit), Ray (Ray, x0, u, tMax))
-import Shaders (Material (Material))
+import Shaders (Material, shader)
 import Lights
     ( Light
     , illuminationAtPoint
@@ -23,17 +25,17 @@ radiance :: IntegratorSpec -> [Light] -> Collider Material -> Ray -> Spectrum
 radiance spec lights rootCollider ray = vcast (recursionDepth spec) ray
   where
     vcast :: Int -> Ray -> Vec3
-    vcast 0 _ = Vec3 0 0 0
+    vcast 0 _ = V3 0 0 0
     vcast maxDepth ray =
       case rootCollider ray of
-        Nothing -> Vec3 0 0 0
+        Nothing -> V3 0 0 0
         Just hit -> vhit maxDepth ray hit
 
     vhit maxDepth
          ray
          hit@(Hit tHit
                   dg@DifferentialGeometry { dgPoint = x, dgNormal = n }
-                  (Material shader)) =
+                  _) =
       (n .* r) @* f r * rs + directIllumination rootCollider dg ray lights bsdf
       where bsdf = shader ray hit
             f omegai = BSDF.at bsdf dg omegai (negate (u ray))

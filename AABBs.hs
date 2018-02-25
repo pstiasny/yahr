@@ -1,11 +1,17 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module AABBs where
 
+import Control.DeepSeq (NFData, rnf)
+import Linear.V3 (V3 (V3))
+
 import Vectors
 import Rays
 
 
-data BoundingBox = BoundingBox Vec3 Vec3 deriving Show
+data BoundingBox = BoundingBox !Vec3 !Vec3 deriving Show
+
+instance NFData BoundingBox where
+  rnf (BoundingBox min max) = rnf min `seq` rnf max
 
 empty = BoundingBox (vof inf) (vof (-inf))
   where inf = read "Infinity"
@@ -50,4 +56,4 @@ centroid (BoundingBox pMin pMax) = 0.5 @* pMin + 0.5 @* pMax
 
 surf :: BoundingBox -> Float
 surf (BoundingBox bMin bMax) = 2 * (dx * dy + dx * dz + dy * dz)
-  where Vec3 dx dy dz = bMax - bMin
+  where V3 dx dy dz = bMax - bMin

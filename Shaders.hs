@@ -6,9 +6,17 @@ import Vectors
 import Rays
 import BSDF
 
-type Shader = Ray -> Hit Material -> BSDF.BSDF
-data Material = Material Shader
+data Material = BlinnPhongMaterial { materialId :: String,
+                                     ambient :: Spectrum,
+                                     diffuse :: Spectrum,
+                                     specular :: Spectrum,
+                                     shininess :: Float
+                                   } deriving (Read, Show)
 
-blinnPhong :: Vec3 -> Vec3 -> Vec3 -> Float -> Shader
-blinnPhong ambientColor diffuseColor specularColor shininess ray hit =
-  diffuseColor &* Lambertian &+ specularColor &* BSDF.Blinn shininess
+type Shader = Ray -> Hit Material -> BSDF.BSDF
+
+blinnPhong :: Shader
+blinnPhong ray (Hit _ _ (BlinnPhongMaterial {ambient, diffuse, specular, shininess})) =
+  diffuse &* Lambertian &+ specular &* BSDF.Blinn shininess
+
+shader = blinnPhong

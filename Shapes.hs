@@ -3,7 +3,9 @@
 module Shapes where
 
 import Data.Maybe (listToMaybe)
+import Linear.V3 (V3 (V3))
 
+import qualified Scene as S
 import Vectors
 import DifferentialGeometry
 import Rays
@@ -23,8 +25,8 @@ collideSphere what r s ray@(Ray {x0, u, tMax}) =
                        DifferentialGeometry {
                          dgPoint = x,
                          dgNormal = norm $ x - s,
-                         dgDPDU = (norm (x - s)) `cross` (Vec3 0 0 1),
-                         dgDPDV = (norm (x - s)) `cross` (Vec3 0 1 0)}
+                         dgDPDU = (norm (x - s)) `cross` (V3 0 0 1),
+                         dgDPDV = (norm (x - s)) `cross` (V3 0 1 0)}
                        what
                   | t <- ts, t > 0, t <= tMax, let x = rayAt ray t]
 
@@ -33,9 +35,18 @@ boundSphere :: Float -> Vec3 -> BB.BoundingBox
 boundSphere r s = BB.fromPoints (s + vof r) (s - vof r)
 
 
-collideTriangle :: a -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> Vec3 -> Collider a
-collideTriangle what p0 p1 p2 n0 n1 n2 (Ray {x0, u, tMax}) =
-  let e1 = p1 - p0
+collideTriangle :: a -> S.Triangle -> Collider a
+collideTriangle what triangle (Ray {x0, u, tMax}) =
+  let p0 = S.p0 triangle
+      p1 = S.p1 triangle
+      p2 = S.p2 triangle
+      n = norm $ (p2 - p0) `cross` (p1 - p0)
+      (n0, n1, n2) =
+        if S.smooth triangle
+          then (S.n0 triangle, S.n1 triangle, S.n2 triangle)
+          else (n, n, n)
+
+      e1 = p1 - p0
       e2 = p2 - p0
       s = x0 - p0
       s1 = u `cross` e2
@@ -59,5 +70,5 @@ collideTriangle what p0 p1 p2 n0 n1 n2 (Ray {x0, u, tMax}) =
       else Nothing
 
 
-boundTriangle :: Vec3 -> Vec3 -> Vec3 -> BB.BoundingBox
-boundTriangle p0 p1 p2 = BB.includePoint (BB.fromPoints p0 p1) p2
+boundTriangle :: S.Triangle -> BB.BoundingBox
+boundTriangle t = BB.includePoint (BB.fromPoints (S.p0 t) (S.p1 t)) (S.p2 t)

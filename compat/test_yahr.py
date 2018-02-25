@@ -30,30 +30,30 @@ def test_parse():
             PointLight(Vec3(4, 10, 10), Vec3(1, 1, 1)),
         ],
         [
-            TriangleMesh(
-                [
-                    Vec3(-1000, -2.2, -1000),
-                    Vec3(1000, -2.2, -1000),
-                    Vec3(1000, -2.2, 1000),
-                    Vec3(-1000, -2.2, 1000),
-                ],
-                [
-                    Vec3(0, 1, 0),
-                    Vec3(0, 1, 0),
-                    Vec3(0, 1, 0),
-                    Vec3(0, 1, 0),
-                ],
-                [
-                    (0, 1, 2),
-                    (0, 2, 3),
-                ],
-                [True, False],
-                "testmat")
+            SceneObject('testmesh', ['testmat'])
         ])
 
-    repr_ = scene.repr()
     with open('.testscene.yahr', 'w') as f:
-        f.write(repr_)
+        mesh_writer = MeshWriter(f)
+        mesh_writer.begin('testmesh', 4, 2)
+
+        mesh_writer.write_point(Vec3(-1000, -2.2, -1000))
+        mesh_writer.write_point(Vec3(1000, -2.2, -1000))
+        mesh_writer.write_point(Vec3(1000, -2.2, 1000))
+        mesh_writer.write_point(Vec3(-1000, -2.2, 1000))
+
+        mesh_writer.write_normal(Vec3(0, 1, 0))
+        mesh_writer.write_normal(Vec3(0, 1, 0))
+        mesh_writer.write_normal(Vec3(0, 1, 0))
+        mesh_writer.write_normal(Vec3(0, 1, 0))
+
+        mesh_writer.write_triangle(0, 1, 2, 0, False)
+        mesh_writer.write_triangle(0, 2, 3, 0, True)
+
+        mesh_writer.end()
+
+        f.write(scene.repr())
+        f.write('END\n')
 
     outpath = '.testout.png'
     if exists(outpath):

@@ -9,8 +9,8 @@ class Scene(object):
 
     def repr(self):
         return (
-            'Scene { integrator = %s, cullingMode = %s, camera = %s, '
-            'materials = [ %s ], lights = [ %s ], objects = [ %s ] }'
+            'SCENE Scene { integrator = %s, cullingMode = %s, camera = %s, '
+            'materials = [ %s ], lights = [ %s ], objects = [ %s ] }\n'
         ) % (
             self.integrator.repr(),
             self.cullingMode.repr(),
@@ -67,7 +67,7 @@ class BlinnPhongMaterial(object):
 
     def repr(self):
         return (
-            'BlinnPhongMaterial { id = "%s", ambient = %s, diffuse = %s, '
+            'BlinnPhongMaterial { materialId = "%s", ambient = %s, diffuse = %s, '
             'specular = %s, shininess = %f }'
         ) % (
             repr_string(self.id), self.ambient.repr(), self.diffuse.repr(),
@@ -87,49 +87,74 @@ class PointLight(object):
         )
 
 
-class TriangleMesh(object):
-    def __init__(
-            self, triangleMeshPoints, triangleMeshNormals,
-            triangleMeshTriangles, triangleMeshSmooth, materialId):
-        self.triangleMeshPoints = triangleMeshPoints
-        self.triangleMeshNormals = triangleMeshNormals
-        self.triangleMeshTriangles = triangleMeshTriangles
-        self.triangleMeshSmooth = triangleMeshSmooth
-        self.materialId = materialId
+class SceneObject(object):
+    def __init__(self, sceneObjectMeshId, sceneObjectMaterialIds):
+        self.sceneObjectMeshId = sceneObjectMeshId
+        self.sceneObjectMaterialIds = sceneObjectMaterialIds
 
     def repr(self):
         return (
-            'TriangleMesh {'
-            'triangleMeshPoints = [ %s ], '
-            'triangleMeshNormals = %s, '
-            'triangleMeshTriangles = [ %s ], '
-            'triangleMeshSmooth = %s, '
-            'materialId = "%s" }'
+            'SceneObject {'
+            'sceneObjectMeshId = "%s", '
+            'sceneObjectMaterialIds = [ %s ] }'
         ) % (
-            ','.join(p.repr() for p in self.triangleMeshPoints),
-            self.repr_normals(),
-            ','.join(
-                '(%d, %d, %d)' % (i1, i2, i3)
-                for i1, i2, i3 in self.triangleMeshTriangles),
-            self.repr_smooth(),
-            repr_string(self.materialId)
+            self.sceneObjectMeshId,
+            ','.join('"%s"' % mid for mid in self.sceneObjectMaterialIds)
         )
 
-    def repr_normals(self):
-        if self.triangleMeshNormals is None:
-            return 'Nothing'
-        else:
-            return 'Just [%s]' % (
-                ','.join(n.repr() for n in self.triangleMeshNormals)
-            )
 
-    def repr_smooth(self):
-        if self.triangleMeshSmooth is None:
-            return 'Nothing'
-        else:
-            return 'Just [%s]' % (
-                ','.join(repr_bool(s) for s in self.triangleMeshSmooth)
-            )
+class MeshWriter(object):
+    def __init__(self, file_):
+        self.file = file_
+        self.beginning_written = False
+        self.points_written = False
+        self.normals_written = False
+        self.triangles_written = False
+
+    def begin(self, name, num_vertices, num_triangles):
+        self.file.write(
+            'MESH {} {} {}\n'
+            .format(num_vertices, num_triangles, name))
+        self.beginning_written = True
+
+    def write_point(self, vec):
+        if not self.beginning_written:
+            raise Exception('write the beggining first')
+        if self.triangles_written:
+            raise Exception(
+                'cannot write points once triangles have been written')
+        if not self.points_written:
+            self.file.write('POINTS\n')
+            self.points_written = True
+        self.file.write('{} {} {}\n'.format(vec.x1, vec.x2, vec.x3))
+
+    def write_normal(self, vec):
+        if not self.normals_written:
+            self.file.write('NORMALS\n')
+            self.normals_written = True
+        self.file.write('{} {} {}\n'.format(vec.x1, vec.x2, vec.x3))
+
+    def write_triangle(self, i1, i2, i3, material_idx, smooth):
+        if not self.beginning_written:
+            raise Exception('write the beggining first')
+        if not self.triangles_written:
+            self.file.write('TRIANGLES\n')
+            self.triangles_written = True
+        self.file.write(
+            '{} {} {} {} {}\n'
+            .format(i1, i2, i3, material_idx, repr_bool(smooth)))
+
+    def end(self):
+        if not self.points_written:
+            self.file.write('POINTS\n')
+            self.points_written = True
+        if not self.normals_written:
+            self.file.write('NORMALS\n')
+            self.normals_written = True
+        if not self.triangles_written:
+            self.file.write('TRIANGLES\n')
+            self.triangles_written = True
+        self.file.write('END MESH\n')
 
 
 class Vec3(object):
@@ -139,7 +164,7 @@ class Vec3(object):
         self.x3 = x3
 
     def repr(self):
-        return '(Vec3 %f %f %f)' % (self.x1, self.x2, self.x3)
+        return '(V3 %f %f %f)' % (self.x1, self.x2, self.x3)
 
 
 def repr_string(s):
@@ -148,3 +173,33 @@ def repr_string(s):
 
 def repr_bool(b):
     return 'True' if b else 'False'
+
+
+def lrepr(x):
+    if hasattr(x, 'lrepr'):
+        yield from x.lrepr()
+    if hasattr(x, 'repr'):
+        yield x.repr()
+    elif isinstance(x, basestr):
+        yield repr_string(x)
+    elif isinstance(x, bool):
+        yield repr_bool(x)
+    elif isinstance(x, list):
+        yield from lrepr_list(x)
+
+
+def lrepr_list(xs):
+    yield '['
+
+    try:
+        first = next(xs)
+    except StopIteration:
+        pass
+    else:
+        yield from lrepr(first)
+
+    for x in xs:
+        yield ', '
+        yield from lrepr(x)
+
+    yield ']'

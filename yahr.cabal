@@ -21,7 +21,7 @@ executable yahr
   -- other-extensions:    
   build-depends:       base >=4.8, containers, JuicyPixels, linear, hspec,
                        vector >= 0.11, parallel, deepseq, argparser,
-                       monad-par
+                       monad-par, attoparsec, bytestring
   -- hs-source-dirs:      
   default-language:    Haskell2010
 
@@ -29,4 +29,7 @@ executable yahr
     -O2
     -threaded
     -rtsopts
-    -eventlog
+    -- -eventlog
+    ---prof
+    ---fprof-auto
+    ---fprof-cafs

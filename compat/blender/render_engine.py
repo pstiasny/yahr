@@ -1,5 +1,6 @@
 from collections import defaultdict
 from os import path
+from time import time
 from subprocess import call
 
 import bpy
@@ -22,6 +23,8 @@ class YahrRenderEngine(bpy.types.RenderEngine):
     _flip = Matrix.Scale(-1, 4, Vector((1, 0, 0)))
 
     def render(self, scene):
+        t0 = time()
+
         scale = scene.render.resolution_percentage / 100.0
         self.size_x = int(scene.render.resolution_x * scale)
         self.size_y = int(scene.render.resolution_y * scale)
@@ -32,12 +35,9 @@ class YahrRenderEngine(bpy.types.RenderEngine):
         scene_path = path.join(bpy.app.tempdir, 'blender_scene.yahr')
         image_path = path.join(bpy.app.tempdir, 'blender_scene.png')
         with open(scene_path, 'w') as f:
-            f.write(self.make_scene(scene).repr())
-
-        if scene.yahr.parallelism_mode == 'EVAL':
-            parallelism_mode_switch = '--parallel-eval'
-        else:
-            parallelism_mode_switch = '--parallel-disabled'
+            self.dump_scene(f, scene)
+        tdump = time()
+        print('time to dump scene', tdump - t0)
 
         threads = '-N{}'.format(scene.yahr.threads)
 
@@ -48,94 +48,91 @@ class YahrRenderEngine(bpy.types.RenderEngine):
         layer.load_from_file(image_path)
 
         self.end_result(result)
+        print('time to render', time() - tdump)
 
-    def make_scene(self, scene):
-        camera = self.make_camera(scene, scene.camera)
+    def dump_scene(self, file_, scene):
         materials = {self.default_material.id: self.default_material}
         objects = []
         for o in scene.objects:
             if o.type == 'MESH':
-                objects.extend(self.make_meshes(scene, materials, o))
+                self.dump_mesh(file_, scene, materials, objects, o)
+
+        camera = self.make_camera(scene, scene.camera)
         lights = [
             self.make_light(scene, o)
             for o in scene.objects
             if o.type == 'LAMP'
         ]
-        return Scene(
+        scene_ = Scene(
             WhittedIntegrator(2),
             BVH(16),
             camera,
             materials.values(),
             lights,
             objects)
+        file_.write(scene_.repr())
 
-    def make_meshes(self, scene, materials, object):
+        file_.write('END\n')
+
+    def dump_mesh(self, file_, scene, materials, objects, object):
+        print('dumping object', object.name)
+        writer = MeshWriter(file_)
+
+        mx = self._flip * object.matrix_world
+
         m = object.to_mesh(scene, True, 'RENDER')
 
-        # NOTE: To support blender's per-face materials, the mesh has to
-        # be split into separate objects for each material.  Currently,
-        # the whole triangle list is copied for each object.  This should
-        # be optimized.
-        vertices = [
-            self.blender_to_yahr_vec(self._flip * object.matrix_world * v.co)
-            for v in m.vertices
-        ]
-        normals = [
-            self.blender_to_yahr_vec(
-                self._flip * object.matrix_world *
-                Vector((v.normal.x, v.normal.y, v.normal.z, 0)))
-            for v in m.vertices
-        ]
-        triangles_by_material_index = (
-            [[] for _ in m.materials] if m.materials else
-            [[]]
-        )
-        smooth_by_material_index = (
-            [[] for _ in m.materials] if m.materials else
-            [[]]
-        )
+        for bl_material in m.materials:
+            try:
+                material = materials[bl_material.name]
+            except KeyError:
+                material = self.make_material(scene, bl_material)
+                materials[bl_material.name] = material
+
+        if m.materials:
+            objects.append(
+                SceneObject(object.name, [mat.name for mat in m.materials]))
+        else:
+            objects.append(
+                SceneObject(object.name, [self.default_material.id]))
+
+        triangle_count = 0
         for face in m.tessfaces:
-            triangles = triangles_by_material_index[face.material_index]
-            smooth = smooth_by_material_index[face.material_index]
             if len(face.vertices) == 3:
-                triangles.append((
-                    face.vertices[0], face.vertices[1], face.vertices[2]
-                ))
-                smooth.append(face.use_smooth)
+                triangle_count += 1
             elif len(face.vertices) == 4:
-                triangles.append((
-                    face.vertices[0], face.vertices[1], face.vertices[2]
-                ))
-                triangles.append((
-                    face.vertices[0], face.vertices[2], face.vertices[3]
-                ))
-                smooth.append(face.use_smooth)
-                smooth.append(face.use_smooth)
+                triangle_count += 2
             else:
                 raise Exception('only triangles and quads are supported')
 
-        if m.materials:
-            meshes = []
-            for bl_material, triangles, smooth in zip(
-                    m.materials,
-                    triangles_by_material_index,
-                    smooth_by_material_index):
-                try:
-                    material = materials[bl_material.name]
-                except KeyError:
-                    material = self.make_material(scene, bl_material)
-                    materials[bl_material.name] = material
-                mesh = TriangleMesh(
-                    vertices, normals, triangles, smooth, material.id)
-                meshes.append(mesh)
-            return meshes
-        else:
-            return [
-                TriangleMesh(vertices, normals,
-                             triangles_by_material_index[0],
-                             smooth_by_material_index[0],
-                             self.default_material.id)
-            ]
+        writer.begin(object.name, len(m.vertices), triangle_count)
+
+        for v in m.vertices:
+            vec3 = self.blender_to_yahr_vec(mx * v.co)
+            writer.write_point(vec3)
+
+        for v in m.vertices:
+            vec3 = self.blender_to_yahr_vec(
+                mx * Vector((v.normal.x, v.normal.y, v.normal.z, 0)))
+            writer.write_normal(vec3)
+
+        for face in m.tessfaces:
+            if len(face.vertices) == 3:
+                writer.write_triangle(
+                    face.vertices[0], face.vertices[1], face.vertices[2],
+                    face.material_index, face.use_smooth)
+            elif len(face.vertices) == 4:
+                writer.write_triangle(
+                    face.vertices[0], face.vertices[1], face.vertices[2],
+                    face.material_index, face.use_smooth)
+                writer.write_triangle(
+                    face.vertices[0], face.vertices[2], face.vertices[3],
+                    face.material_index, face.use_smooth)
+            else:
+                raise Exception('only triangles and quads are supported')
+
+        writer.end()
+        bpy.data.meshes.remove(m)
 
     def make_material(self, scene, material):
         return BlinnPhongMaterial(
