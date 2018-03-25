@@ -20,7 +20,7 @@ executable yahr
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.8, containers, JuicyPixels, linear, hspec,
-                       vector >= 0.11, parallel, deepseq, argparser,
+                       vector >= 0.11, parallel, deepseq, optparse-applicative,
                        monad-par, attoparsec, bytestring
   -- hs-source-dirs:      
   default-language:    Haskell2010

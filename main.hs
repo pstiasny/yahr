@@ -1,10 +1,10 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+import Data.Semigroup ((<>))
 import Text.Printf (printf)
 import System.IO
 import System.CPUTime (getCPUTime)
 import System.Exit (exitSuccess)
-import System.Console.ArgParser (parsedBy, andBy, reqPos, optFlag, withParseResult)
 import Control.Exception (bracket, evaluate)
 import Control.Concurrent (getNumCapabilities)
 import Control.DeepSeq (rnf, force)
@@ -20,6 +20,7 @@ import Codec.Picture
 import qualified Data.Attoparsec.ByteString as AP
 import qualified Data.ByteString.Char8 as B
 import Linear.V3 (V3 (V3))
+import qualified Options.Applicative as OA
 
 import Vectors
 import Rays
@@ -41,9 +42,9 @@ data Invocation = Invocation
 
 
 invocationParser = Invocation
-  `parsedBy` reqPos "input"
-  `andBy` reqPos "output"
-  `andBy` optFlag "sequential" "parallel-mode"
+  <$> OA.argument OA.str (OA.metavar "input")
+  <*> OA.argument OA.str (OA.metavar "output")
+  <*> OA.strOption (OA.long "parallel-mode" <> OA.value "sequential")
 
 
 buildCollisionModel :: InterpreterState -> S.Scene -> [(BoundingBox, Collider Material)]
@@ -170,7 +171,8 @@ handleCommand (S.EndCommand) state = do
   exitSuccess
   return state
 
-main = withParseResult invocationParser $ \invocation -> do
+main = do
+  invocation <- OA.execParser (OA.info invocationParser OA.fullDesc)
   bracket
     (openFile (invInput invocation) ReadMode)
     hClose
