@@ -38,14 +38,17 @@ data Invocation = Invocation
   { invInput :: String
   , invOutput :: String
   , invParMode :: String
+  , invNumBatches :: Maybe Int
   }
 
 
 invocationParser = Invocation
   <$> OA.argument OA.str (OA.metavar "input")
   <*> OA.argument OA.str (OA.metavar "output")
-  <*> OA.strOption (OA.long "parallel-mode" <> OA.value "sequential")
-
+  <*> OA.strOption (OA.long "parallel-mode" <>
+                    OA.short 'p' <>
+                    OA.value "sequential")
+  <*> OA.optional (OA.option OA.auto (OA.long "batches"))
 
 buildCollisionModel :: InterpreterState -> S.Scene -> [(BoundingBox, Collider Material)]
 buildCollisionModel ist s = map makeModel triangles
@@ -148,9 +151,11 @@ handleCommand (S.SceneCommand scene) state = do
       li :: Ray -> Spectrum
       li = radiance (S.integrator scene) (S.lights scene) collider
 
-      nBatches = roundUpPow2 $ max
-        (32 * numThreads)
-        (width * height `div` (16 * 16))
+      nBatches = case (invNumBatches invocation) of
+        Just n -> n
+        Nothing -> roundUpPow2 $ max
+                        (32 * numThreads)
+                        (width * height `div` (16 * 16))
       {-samplePoints = squareBatches width height nBatches-}
       samplePoints = lineBatches width height
 
