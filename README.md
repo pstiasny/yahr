@@ -6,6 +6,8 @@ of Fuctional Programs".  The renderer is based mostly on the book
 "Physically Based Rendering: From Theory To Implementation (2nd
 edition)" by Matt Pharr and Greg Humphreys.
 
+![Rendered image](./bunny2.png)
+
 
 ## Copying
 
